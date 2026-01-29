@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*/__pycache__/
+tools/rag/__pycache__/
+tools/rag/_runs/
+_gateway_backups/
+_bak_packC/
+_runs_*.log
+sha256:*
