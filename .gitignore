@@ -7,3 +7,6 @@ _gateway_backups/
 _bak_packC/
 _runs_*.log
 sha256:*
+
+# local scratch
+_scratch_untracked_*/
