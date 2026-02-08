@@ -227,7 +227,11 @@ def rest_upsert(rest_base: str, table: str, rows: List[Dict[str, Any]], on_confl
 def iter_markdown_files(root: Path) -> List[Path]:
     files: List[Path] = []
     for p in root.rglob("*.md"):
+        if p.is_symlink():
+            continue
         rel = p.relative_to(root).as_posix()
+        if rel.endswith("_LATEST.md"):
+            continue
         if rel.startswith("exports/"):
             continue
         files.append(p)
