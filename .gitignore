@@ -13,3 +13,20 @@
 # backups / broken edits
 /tools/rag/*.bak_*
 /tools/rag/*.broken_*
+
+# env / secrets
+/.env
+
+# python caches
+__pycache__/
+/tools/rag/__pycache__/
+
+# local scratch / runs / backups
+/_bak_packC/
+/_gateway_backups/
+/_scratch_untracked_*/
+/tools/rag/_runs/
+_runs_*.log
+
+# accidental checksum marker files
+/sha256:*
