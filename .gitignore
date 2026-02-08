@@ -1,12 +1,15 @@
-.env
-__pycache__/
-*/__pycache__/
-tools/rag/__pycache__/
-tools/rag/_runs/
-_gateway_backups/
-_bak_packC/
-_runs_*.log
-sha256:*
+# local compose (contains secrets) - not part of repo canon
+/docker-compose.yml
 
-# local scratch
-_scratch_untracked_*/
+# local gateway directory snapshot/build (decide later if it becomes canonical source)
+/mcp-gateway/
+
+# local/experimental rag scripts not yet integrated
+/tools/rag/bruce_rag_embed.py
+/tools/rag/bruce_rag_embed.sh
+/tools/rag/bruce_rag_ingest_journal.py
+/tools/rag/run_rag_embed_daily.sh
+
+# backups / broken edits
+/tools/rag/*.bak_*
+/tools/rag/*.broken_*
