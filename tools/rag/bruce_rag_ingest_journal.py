@@ -1,5 +1,7 @@
-
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import argparse
 import hashlib
 import json
 import os
@@ -11,21 +13,19 @@ import urllib.parse
 import urllib.request
 import urllib.error
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+# Same stable namespace as manual-docs ingest (do not change once data exists)
+UUID_NS = uuid.UUID("3b3b0c3b-4c1a-4b1e-9b3e-9c2f3d10a5a1")
 
 DEFAULT_GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://127.0.0.1:4000")
 DEFAULT_BRUCE_TOKEN = os.environ.get("BRUCE_TOKEN", "bruce-secret-token-01")
-DEFAULT_MANUAL_DIR = os.environ.get("MANUAL_DOCS_DIR", "/home/furycom/manual-docs")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
 
-# Stable namespace UUIDv5 (do not change once data exists)
-UUID_NS = uuid.UUID("3b3b0c3b-4c1a-4b1e-9b3e-9c2f3d10a5a1")
-
-SOURCE = "manual-docs"
-DOC_TYPE = "manual"
+SOURCE = "journal"
+DOC_TYPE = "journal"
 
 def eprint(*a: Any) -> None:
     print(*a, file=sys.stderr)
@@ -41,24 +41,22 @@ def sha256_text(s: str) -> str:
 def normalize_newlines(s: str) -> str:
     return s.replace("\r\n", "\n").replace("\r", "\n")
 
-def extract_title(md_text: str, fallback: str) -> Tuple[str, bool]:
-    """
-    Returns (title, from_heading).
-    """
-    for line in md_text.splitlines():
-        m = re.match(r"^\s*#\s+(.+?)\s*$", line)
-        if m:
-            t = m.group(1).strip()
-            if t:
-                return t[:300], True
-    return fallback[:300], False
+def safe_title_from_text(text: str, fallback: str) -> str:
+    t = normalize_newlines(text).strip()
+    if not t:
+        return fallback[:300]
+    first_line = t.splitlines()[0].strip()
+    first_line = re.sub(r"\s+", " ", first_line)
+    if not first_line:
+        return fallback[:300]
+    return first_line[:300]
 
 @dataclass
 class Chunk:
     chunk_index: int
     text: str
 
-def chunk_markdown(text: str, target_chars: int = 1400, overlap: int = 180) -> List[Chunk]:
+def chunk_text(text: str, target_chars: int = 1400, overlap: int = 180) -> List[Chunk]:
     t = normalize_newlines(text).strip()
     if not t:
         return []
@@ -108,9 +106,9 @@ def chunk_markdown(text: str, target_chars: int = 1400, overlap: int = 180) -> L
     return out
 
 def http_json(url: str, method: str = "GET",
-              headers: Optional[Dict[str, str]] = None,
-              body_obj: Optional[Any] = None,
-              timeout: int = 25) -> Tuple[int, Dict[str, str], str]:
+             headers: Optional[Dict[str, str]] = None,
+             body_obj: Optional[Any] = None,
+             timeout: int = 25) -> Tuple[int, Dict[str, str], str]:
     hdrs = headers or {}
     data = None
     if body_obj is not None:
@@ -123,10 +121,10 @@ def http_json(url: str, method: str = "GET",
             status = getattr(resp, "status", 200)
             resp_headers = {k.lower(): v for k, v in dict(resp.headers).items()}
             text = resp.read().decode("utf-8", errors="replace")
-            return status, resp_headers, text
+            return int(status), resp_headers, text
     except urllib.error.HTTPError as ex:
         text = ex.read().decode("utf-8", errors="replace") if ex.fp else str(ex)
-        return ex.code, {k.lower(): v for k, v in dict(ex.headers).items()}, text
+        return int(ex.code), {k.lower(): v for k, v in dict(ex.headers).items()}, text
     except Exception as ex:
         return 0, {}, str(ex)
 
@@ -214,7 +212,7 @@ def pick_rest_base() -> str:
             status, _, _ = http_json(url, method="GET", headers=hdrs, body_obj=None, timeout=8)
             if status in (200, 206, 401, 403):
                 return rb2
-    raise RuntimeError("Could not detect PostgREST endpoint. SUPABASE_URL seems not to expose /rest/v1 on tested ports (3000/8000/54321).")
+    raise RuntimeError("Could not detect PostgREST endpoint from SUPABASE_URL.")
 
 def rest_upsert(rest_base: str, table: str, rows: List[Dict[str, Any]], on_conflict: str, timeout: int = 40) -> None:
     if not rows:
@@ -224,26 +222,32 @@ def rest_upsert(rest_base: str, table: str, rows: List[Dict[str, Any]], on_confl
     if status not in (200, 201, 204):
         raise RuntimeError(f"rest upsert {table} http {status}: {text[:800]}")
 
-def iter_markdown_files(root: Path) -> List[Path]:
-    files: List[Path] = []
-    for p in root.rglob("*.md"):
-        if p.is_symlink():
-            continue
-        rel = p.relative_to(root).as_posix()
-        if rel.endswith("_LATEST.md"):
-            continue
-        if rel.startswith("exports/"):
-            continue
-        files.append(p)
-    files.sort(key=lambda x: x.relative_to(root).as_posix())
-    return files
+def sql_fetch_journal(limit: int) -> str:
+    lim = int(max(1, limit))
+    return f"""
+select
+  id::bigint as id,
+  coalesce(source,'')::text as source,
+  coalesce(author,'')::text as author,
+  coalesce(channel,'')::text as channel,
+  coalesce(content,'')::text as content,
+  created_at
+from public.bruce_memory_journal
+order by created_at asc
+limit {lim}
+;
+""".strip()
 
 def main() -> int:
-    print("BRUCE RAG Ingest (manual-docs -> bruce_docs/bruce_chunks)")
-    print(f"- gateway:      {DEFAULT_GATEWAY_URL}")
-    print(f"- manual_dir:   {DEFAULT_MANUAL_DIR}")
-    print(f"- source:       {SOURCE}")
-    print(f"- doc_type:     {DOC_TYPE}")
+    parser = argparse.ArgumentParser(description="BRUCE RAG Ingest (bruce_memory_journal -> bruce_docs/bruce_chunks)")
+    parser.add_argument("--limit", type=int, default=int(os.environ.get("BRUCE_JOURNAL_LIMIT", "5000")))
+    args = parser.parse_args()
+
+    print("BRUCE RAG Ingest (journal -> bruce_docs/bruce_chunks)")
+    print(f"- gateway:    {DEFAULT_GATEWAY_URL}")
+    print(f"- source:     {SOURCE}")
+    print(f"- doc_type:   {DOC_TYPE}")
+    print(f"- limit:      {args.limit}")
     print()
 
     try:
@@ -252,119 +256,84 @@ def main() -> int:
         eprint("ERROR:", str(ex)[:500])
         return 2
 
-    root = Path(DEFAULT_MANUAL_DIR)
-    if not root.exists() or not root.is_dir():
-        eprint(f"ERROR: MANUAL_DOCS_DIR not found or not a dir: {root}")
-        return 3
-
-    md_files = iter_markdown_files(root)
-    print(f"Found markdown files: {len(md_files)}")
-    if not md_files:
-        print("Nothing to ingest.")
-        return 0
-
     try:
         _ = gateway_exec_sql("select 1 as ok;")
     except Exception as ex:
         eprint("ERROR: gateway exec-sql failed:", str(ex)[:600])
-        return 4
+        return 3
 
     try:
         rest_base = pick_rest_base()
     except Exception as ex:
         eprint("ERROR:", str(ex)[:800])
-        return 5
+        return 4
 
     print(f"Detected PostgREST: {rest_base}")
     print()
 
-    # Deduplicate by original_path (stable identity per file path)
-    # Keep all file paths in metadata.files so no information is lost.
-    docs_by_path: Dict[str, Dict[str, Any]] = {}
-    text_by_path: Dict[str, str] = {}
+    data = gateway_exec_sql(sql_fetch_journal(args.limit), timeout=35).get("data")
+    if not isinstance(data, list):
+        eprint("ERROR: unexpected journal query result")
+        return 5
 
-    for fp in md_files:
-        rel = fp.relative_to(root).as_posix()
-        original_path = "/manual-docs/" + rel
+    rows = []
+    for r in data:
+        if not isinstance(r, dict):
+            continue
+        content = str(r.get("content") or "")
+        _t = content.strip()
+        if not _t:
+            continue
+        if _t in ("...","..",".","…","—","-","--"):
+            continue
+        if len(_t) < 5:
+            continue
+        rows.append(r)
 
-        raw = fp.read_bytes()
-        content_sha = sha256_bytes(raw)
-        text = raw.decode("utf-8", errors="replace")
+    print(f"Journal rows fetched: {len(data)}")
+    print(f"Journal rows usable (non-empty content): {len(rows)}")
+    if not rows:
+        print("Nothing to ingest.")
+        return 0
 
-        title_fallback = Path(rel).stem.replace("-", " ").replace("_", " ")
-        title, from_heading = extract_title(text, fallback=title_fallback)
-
-        st = fp.stat()
-        file_meta = {
-            "rel_path": rel,
-            "original_path": original_path,
-            "bytes": int(st.st_size),
-            "mtime_unix": int(st.st_mtime),
-        }
-
-        if original_path not in docs_by_path:
-            # doc_id stable on (source + sha) to match unique constraint
-            doc_id = str(uuid.uuid5(UUID_NS, original_path))
-
-            meta = {
-                "kind": "manual-docs",
-                "ingest": "phase2_rest_upsert_dedupe_by_source_sha_v4_chunks_text_sha256",
-                "sha256": content_sha,
-                "n_files": 1,
-                "files": [file_meta],
-                "title_candidates": [title],
-            }
-
-            docs_by_path[original_path] = {
-                "doc_id": doc_id,
-                "source": SOURCE,
-                "title": title,
-                "doc_type": DOC_TYPE,
-                "content_sha256": content_sha,
-                "original_path": original_path,  # representative path
-                "metadata": meta,
-                "_title_from_heading": bool(from_heading),
-            }
-            text_by_path[original_path] = text
-        else:
-            d = docs_by_path[original_path]
-            meta = d.get("metadata") or {}
-            files_list = meta.get("files") if isinstance(meta.get("files"), list) else []
-            files_list.append(file_meta)
-            meta["files"] = files_list
-            meta["n_files"] = int(meta.get("n_files", 1)) + 1
-
-            tc = meta.get("title_candidates") if isinstance(meta.get("title_candidates"), list) else []
-            tc.append(title)
-            meta["title_candidates"] = tc
-
-            # If current doc title came from fallback but we now see a real heading, upgrade title.
-            if not d.get("_title_from_heading", False) and from_heading:
-                d["title"] = title
-                d["_title_from_heading"] = True
-
-            d["metadata"] = meta
-
-    # Build payloads
     docs_payload: List[Dict[str, Any]] = []
     chunks_payload: List[Dict[str, Any]] = []
 
-    t0 = time.time()
+    for r in rows:
+        jid = int(r.get("id"))
+        j_source = str(r.get("source") or "")
+        j_author = str(r.get("author") or "")
+        j_channel = str(r.get("channel") or "")
+        j_content = str(r.get("content") or "")
+        j_created_at = r.get("created_at")
 
-    for original_path, d in docs_by_path.items():
-        doc_id = d["doc_id"]
+        original_path = f"/bruce_memory_journal/{jid}"
+        doc_id = str(uuid.uuid5(UUID_NS, original_path))
+
+        title = safe_title_from_text(j_content, fallback=f"journal {jid}")
+        content_sha = sha256_text(j_content)
+
+        meta = {
+            "kind": "journal",
+            "journal_id": jid,
+            "journal_source": j_source,
+            "journal_author": j_author,
+            "journal_channel": j_channel,
+            "journal_created_at": j_created_at,
+            "ingest": "journal_v1_python_uuid5_chunks_text_sha256",
+        }
+
         docs_payload.append({
-            "doc_id": d["doc_id"],
-            "source": d["source"],
-            "title": d["title"],
-            "doc_type": d["doc_type"],
-            "content_sha256": d["content_sha256"],
-            "original_path": d["original_path"],
-            "metadata": d["metadata"],
+            "doc_id": doc_id,
+            "source": SOURCE,
+            "title": title,
+            "doc_type": DOC_TYPE,
+            "content_sha256": content_sha,
+            "original_path": original_path,
+            "metadata": meta,
         })
 
-        text = text_by_path.get(original_path, "")
-        chunks = chunk_markdown(text, target_chars=1400, overlap=180)
+        chunks = chunk_text(j_content, target_chars=1400, overlap=180)
         for ch in chunks:
             chunk_id = str(uuid.uuid5(UUID_NS, f"{doc_id}:{ch.chunk_index}"))
             chunks_payload.append({
@@ -372,17 +341,17 @@ def main() -> int:
                 "doc_id": doc_id,
                 "chunk_index": int(ch.chunk_index),
                 "text": ch.text,
-                "text_sha256": sha256_text(ch.text),  # REQUIRED by NOT NULL constraint
+                "text_sha256": sha256_text(ch.text),
             })
 
-    docs_ingested = 0
-    chunks_inserted = 0
+    t0 = time.time()
 
-    BATCH_DOCS = 50
-    BATCH_CHUNKS = 200
-
-    # Upsert docs on the unique constraint: (source, original_path)
+    BATCH_DOCS = 200
+    BATCH_CHUNKS = 400
     DOCS_ON_CONFLICT = "source,original_path"
+
+    docs_ingested = 0
+    chunks_ingested = 0
 
     for i in range(0, len(docs_payload), BATCH_DOCS):
         batch = docs_payload[i:i + BATCH_DOCS]
@@ -392,13 +361,13 @@ def main() -> int:
     for i in range(0, len(chunks_payload), BATCH_CHUNKS):
         batch = chunks_payload[i:i + BATCH_CHUNKS]
         rest_upsert(rest_base, "bruce_chunks", batch, on_conflict="chunk_id", timeout=90)
-        chunks_inserted += len(batch)
+        chunks_ingested += len(batch)
 
     dt = time.time() - t0
     print()
     print("Ingest summary:")
-    print(f"- docs_ingested:   {docs_ingested}")
-    print(f"- chunks_inserted: {chunks_inserted}")
+    print(f"- docs_upserted:   {docs_ingested}")
+    print(f"- chunks_upserted: {chunks_ingested}")
     print(f"- seconds:         {dt:.1f}")
     return 0
 

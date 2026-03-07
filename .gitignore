@@ -1,32 +1,35 @@
-# local compose (contains secrets) - not part of repo canon
-/docker-compose.yml
+# Backups
+*.bak*
+*.backup*
+*_backup_*
+server_backup_*
 
-# local gateway directory snapshot/build (decide later if it becomes canonical source)
-/mcp-gateway/
+# Old patches
+_patch_*/
+_bak_*/
+_scratch_*/
+_gateway_backups/
 
-# local/experimental rag scripts not yet integrated
-/tools/rag/bruce_rag_embed.py
-/tools/rag/bruce_rag_embed.sh
-/tools/rag/bruce_rag_ingest_journal.py
-/tools/rag/run_rag_embed_daily.sh
+# Environment
+.env
+.env.*
+!.env.example
 
-# backups / broken edits
-/tools/rag/*.bak_*
-/tools/rag/*.broken_*
-
-# env / secrets
-/.env
-
-# python caches
+# Node
+node_modules/
+package-lock.json
 __pycache__/
-/tools/rag/__pycache__/
 
-# local scratch / runs / backups
-/_bak_packC/
-/_gateway_backups/
-/_scratch_untracked_*/
-/tools/rag/_runs/
-_runs_*.log
+# Logs  
+*.log
+bruce-fallback.log
 
-# accidental checksum marker files
-/sha256:*
+# Docker image artifacts
+sha256:*
+
+# Misc
+*.tmp
+*.swp
+*.snip
+mcp-gateway/
+config/

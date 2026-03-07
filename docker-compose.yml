@@ -1,0 +1,73 @@
+services:
+  code-server:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: code-server
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Toronto
+      - PASSWORD=mcpServer2024!
+      - SUDO_PASSWORD=mcpServer2024!
+    volumes:
+      - ./config:/config
+      - .:/config/workspace
+    ports:
+      - "8080:8443"
+    restart: unless-stopped
+
+  mcp-gateway:
+
+    env_file:
+
+      - .env
+    build: ./mcp-gateway
+    container_name: mcp-gateway
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - MANUAL_ROOT=/manual-docs
+      - BRUCE_AUTH_TOKEN=${BRUCE_AUTH_TOKEN}
+      - BRUCE_TOKEN=${BRUCE_TOKEN}
+      - BRUCE_LLM_API_BASE=http://192.168.2.32:8000/v1
+      - BRUCE_LLM_MODEL=${BRUCE_LLM_MODEL}
+      - BRUCE_MAX_MESSAGE_CHARS=8000
+      - BRUCE_LLM_TIMEOUT_MS=180000
+      - EMBEDDER_URL=http://192.168.2.85:8081
+      - BRUCE_MAX_CONCURRENT=3
+      - BRUCE_FALLBACK_LOG_PATH=/workspace/mcp-gateway/bruce-fallback.log
+      - BRUCE_SOURCE_DEFAULT=openwebui
+
+    volumes:
+      - /home/furycom/mcp-stack:/workspace
+      - /home/furycom/mcp-stack/server.js:/app/server.js:ro
+      - /home/furycom/mcp-stack/shared:/app/shared:ro
+      - /home/furycom/mcp-stack/routes:/app/routes:ro
+      - /home/furycom/manual-docs:/manual-docs:ro
+      - /home/furycom/bruce-config:/home/furycom/bruce-config:ro
+      - /home/furycom/inbox:/home/furycom/inbox
+      - /home/furycom/archive_inbox:/home/furycom/archive_inbox
+      - /home/furycom/venv-ingestion:/home/furycom/venv-ingestion:ro
+      - /home/furycom/push_to_staging.py:/home/furycom/push_to_staging.py:ro
+      - /home/furycom/bruce_ingest.py:/home/furycom/bruce_ingest.py:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  mcp-shell:
+    image: tsl0922/ttyd:latest
+    container_name: mcp-shell
+    restart: unless-stopped
+    command:
+      - /usr/bin/ttyd
+      - -p
+      - "7681"
+      - -W
+      - -t
+      - fontSize=16
+      - -t
+      - theme=material
+      - bash
+    ports:
+      - "7681:7681"
+    volumes:
+      - /home/furycom/mcp-stack:/workspace
