@@ -33,3 +33,4 @@ sha256:*
 *.snip
 mcp-gateway/
 config/
+patch_ssh_keypref.py
