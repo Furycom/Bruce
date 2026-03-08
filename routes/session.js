@@ -247,6 +247,21 @@ router.post('/bruce/session/init', async (req, res) => {
     });
 
     // ── 3. Résumé vLLM local (dégradé gracieux si down) ─────────────────────
+    // [877] INJECTION FORCÃE: profil Yann + donnÃ©es critiques (indÃ©pendant du topic)
+    let userProfileContext = '';
+    try {
+      const profileRes = await fetchWithTimeout(
+        base + '/knowledge_base?category=eq.user_profile&select=question,answer&limit=5',
+        { headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' } },
+        5000
+      );
+      const profiles = await profileRes.json();
+      if (Array.isArray(profiles) && profiles.length > 0) {
+        userProfileContext = '\n\n**PROFIL UTILISATEUR YANN (injection [877]):**\n'
+          + profiles.map(p => p.answer.slice(0, 500)).join('\n');
+      }
+    } catch (e) { /* non-bloquant */ }
+
     let llmSummary = null;
     let llmOk = false;
 
@@ -361,7 +376,8 @@ Sois direct, precis, actionnable.`;
       + intentionBlock
       + scopeBlock
       + buildContextForProfile(llmProfile, dashboard, roadmap, effectiveLessons, ragResults, currentState)
-      + toolsBlock;
+      + toolsBlock
+      + userProfileContext;
 
     return res.json({
       ok: true,
