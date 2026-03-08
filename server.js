@@ -394,6 +394,11 @@ app.get("/openapi.json", (req, res) => {
   res.send(JSON.stringify(BRUCE_OPENAPI_SPEC, null, 2));
 });
 
+// [866] Healthz endpoint sans auth (pour Docker healthcheck)
+app.get("/bruce/healthz", (req, res) => {
+  res.json({ ok: true, uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
 app.listen(PORT, () => {
   console.log("MCP Gateway listening on port " + PORT);
 });
