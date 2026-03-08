@@ -506,6 +506,39 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
 
     // ── 6. Construire la checklist avec avertissements ──
     const warnings = [];
+
+    // [876] VÃ©rification handoff_vivant MAJ depuis dÃ©but session
+    try {
+      const hvRes = await fetchWithTimeout(
+        base + '/current_state?key=eq.handoff_vivant&select=updated_at',
+        { headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' } },
+        5000
+      );
+      const hvData = await hvRes.json();
+      if (Array.isArray(hvData) && hvData.length > 0) {
+        const hvUpdated = new Date(hvData[0].updated_at);
+        const sessionStart = new Date(); // approximation: si pas MAJ rÃ©cemment c'est suspect
+        const ageMinutes = (Date.now() - hvUpdated.getTime()) / 60000;
+        if (ageMinutes > 120) {
+          warnings.push('[876] WARNING: handoff_vivant non mis Ã  jour depuis ' + Math.round(ageMinutes) + ' min. La sauvegarde de session est-elle complÃ¨te?');
+        }
+      }
+    } catch (e) { warnings.push('[876] Could not verify handoff_vivant: ' + e.message); }
+
+    // [876] VÃ©rification git status sur .230
+    try {
+      const { execFile } = require('child_process');
+      const gitOut = await new Promise((resolve) => {
+        execFile('git', ['status', '--porcelain'], { cwd: '/home/furycom/mcp-stack', timeout: 5000 }, (err, stdout) => {
+          resolve(stdout || '');
+        });
+      });
+      if (gitOut.trim().length > 0) {
+        const uncommitted = gitOut.trim().split('\n').length;
+        warnings.push('[876] WARNING: ' + uncommitted + ' fichier(s) non commite(s) dans mcp-stack. Git commit recommande avant fermeture.');
+      }
+    } catch (e) { /* git check optionnel */ }
+
     if (stagingPending > 0) {
       warnings.push(`⚠️ ${stagingPending} items en staging pending — valider AVANT de clôturer.`);
     }
