@@ -307,7 +307,7 @@ Sois direct, precis, actionnable.`;
           body: JSON.stringify({
             model: 'qwen2.5-7b',
             messages: [{ role: 'user', content: prompt }],
-            max_tokens: 200,
+            max_tokens: 500,
             temperature: 0.2,
             metadata: { trace_name: 'bruce-bootstrap', generation_name: 'bootstrap-summary' }
           })

@@ -58,7 +58,7 @@ router.post('/tools/echo', (req, res) => {
 
 router.post('/tools/supabase/exec-sql', async (req, res) => {
   try {
-    const sql = String((req.body && req.body.sql) ? req.body.sql : '').trim().replace(/;+\s*$/, '');
+    const sql = String((req.body && (req.body.sql || req.body.query)) ? (req.body.sql || req.body.query) : '').trim().replace(/;+\s*$/, '');
     if (!sql) {
       return res.status(400).json({ ok: false, status: 400, error: 'Missing sql' });
     }
