@@ -251,14 +251,14 @@ router.post('/bruce/session/init', async (req, res) => {
     let userProfileContext = '';
     try {
       const profileRes = await fetchWithTimeout(
-        base + '/knowledge_base?category=eq.user_profile&select=question,answer&limit=5',
+        base + '/knowledge_base?category=eq.user_profile&subcategory=eq.profil_yann&select=answer&limit=1',
         { headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' } },
         5000
       );
       const profiles = await profileRes.json();
       if (Array.isArray(profiles) && profiles.length > 0) {
         userProfileContext = '\n\n**PROFIL UTILISATEUR YANN (injection [877]):**\n'
-          + profiles.map(p => p.answer.slice(0, 500)).join('\n');
+          + profiles.map(p => p.answer.slice(0, 600)).join('\n');
       }
     } catch (e) { /* non-bloquant */ }
 
