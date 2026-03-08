@@ -1,0 +1,33 @@
+# === BRUCE .dockerignore ===
+# Created session Opus 2026-03-08, task [776]
+
+# Backup files
+*.bak*
+*.bak
+*.backup
+*.orig
+
+# Gateway backups directory
+_gateway_backups/
+_scratch_/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose*.yml.bak*
+Dockerfile.bak*
+
+# IDE / editor
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dev artifacts
+node_modules/.cache/
