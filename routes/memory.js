@@ -25,7 +25,14 @@ router.post('/bruce/memory/append', async (req, res) => {
 
     const metadata = (body.metadata && typeof body.metadata === 'object')
       ? body.metadata
-      : null;
+      : {};
+
+    // Merge author + tags into metadata (columns don't exist on bruce_memory_journal)
+    const enrichedMetadata = {
+      ...metadata,
+      ...(author ? { author } : {}),
+      ...(tags.length ? { tags } : {}),
+    };
 
     const base = String(SUPABASE_URL || '').replace(/\/+$/, '');
     const key  = String(SUPABASE_KEY || '');
@@ -38,13 +45,13 @@ router.post('/bruce/memory/append', async (req, res) => {
       ? base.replace(/\/rest\/v1$/, '') + '/rest/v1/bruce_memory_journal'
       : base + '/bruce_memory_journal';
 
+    // Map to actual table schema: source, event_type, content, metadata, session_id
     const row = {
       source,
-      author: author || null,
-      channel: channel || null,
+      event_type: channel || 'general',
       content,
-      tags,
-      metadata,
+      metadata: Object.keys(enrichedMetadata).length ? enrichedMetadata : null,
+      session_id: body.session_id || null,
     };
 
     const headers = {
