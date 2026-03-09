@@ -888,7 +888,7 @@ router.post('/bruce/session/close', async (req, res) => {
       ? body.success_captures.filter(s => s && s.task_id && s.pattern && s.pattern.trim())
       : [];
     const allDoneIds = new Set([
-      ...tasksDone,
+      ...tasksDoneParsed.map(t => t.id),
       ...tasksStatus.filter(t => t.status === 'done').map(t => t.id)
     ]);
     const capturedTaskIds = new Set(successCaptures.map(s => s.task_id));
