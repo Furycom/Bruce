@@ -9,6 +9,7 @@ const {
 const { fetchWithTimeout } = require('../shared/fetch-utils');
 const { bruceRagContext } = require('./rag');
 const { detectLLMIdentity, loadLLMProfile, buildContextForProfile } = require('../shared/llm-profiles');
+const { buildContextForClaude } = require('../shared/context-engine');
 
 // Dependency injection for safePythonSpawn (defined in server.js)
 let _safePythonSpawn = null;
@@ -371,13 +372,30 @@ Sois direct, precis, actionnable.`;
         '               staging_queue champs EXACTS: table_cible + contenu_json + author_system\n' +
         '⚡  AVANT SSH/docker/transfert/ecriture REST: POST /bruce/preflight {action_type}\n\n'
       : '';
-    const contextPrompt = PROTOCOLE_690
-      + (llmSummary ? '**Briefing:** ' + llmSummary + '\n\n' : '')
-      + intentionBlock
-      + scopeBlock
-      + buildContextForProfile(llmProfile, dashboard, roadmap, effectiveLessons, ragResults, currentState)
-      + toolsBlock
-      + userProfileContext;
+    // [878] CONTEXT ENGINE: Use intelligent context for Claude, legacy for others
+    let contextPrompt;
+    let contextMeta = null;
+    if (llmIdentity === 'claude') {
+      const ceResult = await buildContextForClaude({
+        dashboard,
+        tasks: roadmap,
+        lessons: effectiveLessons,
+        ragResults,
+        currentState,
+        topic: ragQuery
+      });
+      contextPrompt = (llmSummary ? '**Briefing:** ' + llmSummary + '\n\n' : '')
+        + intentionBlock + scopeBlock + ceResult.context_prompt;
+      contextMeta = ceResult.context_meta;
+    } else {
+      contextPrompt = PROTOCOLE_690
+        + (llmSummary ? '**Briefing:** ' + llmSummary + '\n\n' : '')
+        + intentionBlock
+        + scopeBlock
+        + buildContextForProfile(llmProfile, dashboard, roadmap, effectiveLessons, ragResults, currentState)
+        + toolsBlock
+        + userProfileContext;
+    }
 
     return res.json({
       ok: true,
@@ -388,6 +406,7 @@ Sois direct, precis, actionnable.`;
       llm_identity: llmIdentity,
       profile_used: llmProfile.profile_name || llmIdentity,
       context_prompt: contextPrompt,
+      context_meta: contextMeta,
       briefing: llmSummary,
       llm_ok: llmOk,
       dashboard,
