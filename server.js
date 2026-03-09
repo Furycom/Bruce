@@ -40,6 +40,7 @@ const ragRoutes = require('./routes/rag');
 const askRoutes = require('./routes/ask');
 const chatRoutes = require('./routes/chat');
 const sessionRoutes = require('./routes/session');
+const roadmapRoutes = require('./routes/roadmap');
 
 // ========== SHARED MODULES (C7 refonte) ==========
 const { fetchWithTimeout } = require('./shared/fetch-utils');
@@ -133,6 +134,7 @@ app.use(chatRoutes);
 // Wire dependency injection
 infraRoutes.setSafePythonSpawn(safePythonSpawn);
 app.use(sessionRoutes);
+app.use(roadmapRoutes);
 sessionRoutes.setSafePythonSpawn(safePythonSpawn);
 
 // ========== HEALTH ==========

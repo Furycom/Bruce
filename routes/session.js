@@ -856,19 +856,26 @@ router.post('/bruce/session/close', async (req, res) => {
     // Accepts tasks_done: [id1, id2, ...] as a simple array of task IDs to mark done.
     // Convenience shortcut so sessions don't forget to update roadmap status.
     // Merges with tasks_status (tasks_status takes precedence if same ID in both).
-    const tasksDone = Array.isArray(body.tasks_done) ? body.tasks_done.filter(id => typeof id === 'number' && id > 0) : [];
+    // [863] tasks_done accepts: [id, ...] or [{id, evidence}, ...]
+    // Simple IDs get auto-evidence from session summary. Objects use their own evidence.
+    const rawTasksDone = Array.isArray(body.tasks_done) ? body.tasks_done : [];
+    const tasksDoneParsed = rawTasksDone.map(item => {
+      if (typeof item === 'number' && item > 0) return { id: item, evidence: 'Completed in session ' + sessionId + ': ' + (body.summary || '').slice(0, 200) };
+      if (item && typeof item === 'object' && typeof item.id === 'number' && item.id > 0 && item.evidence) return { id: item.id, evidence: String(item.evidence).trim() };
+      return null;
+    }).filter(Boolean);
     const alreadyHandled = new Set(tasksStatus.map(t => t.id));
-    for (const taskId of tasksDone) {
-      if (alreadyHandled.has(taskId)) continue;
+    for (const task of tasksDoneParsed) {
+      if (alreadyHandled.has(task.id)) continue;
       try {
         const r = await fetchWithTimeout(
-          base + '/roadmap?id=eq.' + taskId,
-          { method: 'PATCH', headers: hSupa, body: JSON.stringify({ status: 'done' }) },
+          base + '/roadmap?id=eq.' + task.id,
+          { method: 'PATCH', headers: hSupa, body: JSON.stringify({ status: 'done', evidence: task.evidence }) },
           5000
         );
-        taskResults.push({ id: taskId, status: 'done', ok: r.ok, via: 'tasks_done_shortcut' });
+        taskResults.push({ id: task.id, status: 'done', ok: r.ok, via: 'tasks_done_shortcut' });
       } catch (e) {
-        taskResults.push({ id: taskId, status: 'done', ok: false, error: e.message, via: 'tasks_done_shortcut' });
+        taskResults.push({ id: task.id, status: 'done', ok: false, error: e.message, via: 'tasks_done_shortcut' });
       }
     }
 
