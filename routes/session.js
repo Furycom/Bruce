@@ -982,7 +982,7 @@ router.post('/bruce/session/close', async (req, res) => {
     if (pendingCount > 0) {
       try {
         const valRes = await fetchWithTimeout(
-          'http://172.17.0.1:4001/run/validate',
+          'http://172.18.0.1:4001/run/validate',
           { method: 'POST', headers: { 'X-BRUCE-TOKEN': (BRUCE_AUTH_TOKEN || 'bruce-secret-token-01'), 'Content-Type': 'application/json' } },
           65000
         );

@@ -60,7 +60,7 @@ router.post('/bruce/write', async (req, res) => {
     if (shouldValidate) {
       try {
         const valRes = await fetchWithTimeout(
-          'http://192.168.2.230:4001/run/validate',
+          'http://172.18.0.1:4001/run/validate',
           { method: 'POST', headers: { 'X-BRUCE-TOKEN': String(process.env.BRUCE_AUTH_TOKEN || 'bruce-secret-token-01') } },
           20000
         );

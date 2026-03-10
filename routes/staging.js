@@ -10,7 +10,7 @@ router.post('/bruce/staging/validate', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(401).json({ error: auth.error });
   try {
-    const r = await fetch('http://172.17.0.1:4001/run/validate', {
+    const r = await fetch('http://172.18.0.1:4001/run/validate', {
       method: 'POST',
       headers: { 'X-BRUCE-TOKEN': 'bruce-secret-token-01', 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(65000)
