@@ -633,22 +633,9 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
       ]
     };
 
-    // [711] COUCHE 3 — fire-and-forget session_error_detector.py
-    try {
-      const det = safePythonSpawn('/home/furycom/session_error_detector.py',
-        ['--session-id', String(sessionId)], { detached: true, stdio: 'ignore' });
-      if (det) det.unref();
-
-    // [712] COUCHE 4 — fire-and-forget escalation_engine.py (30s après detector)
-    setTimeout(() => {
-      const esc = safePythonSpawn('/home/furycom/escalation_engine.py',
-        ['--session-id', String(sessionId)], { detached: true, stdio: 'ignore' });
-      if (esc) esc.unref();
-    }, 30000);
-    } catch (_e711) {
-      warnings.push('session_error_detector spawn: ' + _e711.message);
-    }
-
+    // [841] REMOVED: session_error_detector.py and escalation_engine.py were dead-letter code
+    // (python3 not available in container, safePythonSpawn always returned null).
+    // Replaced by bruce_alert_dispatcher.py running hourly on host via cron.
     return res.json({
       ok: true,
       session_id: sessionId,
