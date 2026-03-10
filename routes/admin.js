@@ -1,8 +1,11 @@
 'use strict';
 const { Router } = require('express');
+const { validateBruceAuth } = require('../shared/auth');
 const router = Router();
 
 router.get('/admin', (req, res) => {
+  const auth = validateBruceAuth(req);
+  if (!auth.ok) return res.status(auth.status || 401).json({ error: auth.error || 'Unauthorized' });
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
