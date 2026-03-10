@@ -57,21 +57,3 @@ services:
       retries: 3
       start_period: 15s
 
-  mcp-shell:
-    image: tsl0922/ttyd:latest
-    container_name: mcp-shell
-    restart: unless-stopped
-    command:
-      - /usr/bin/ttyd
-      - -p
-      - "7681"
-      - -W
-      - -t
-      - fontSize=16
-      - -t
-      - theme=material
-      - bash
-    ports:
-      - "7681:7681"
-    volumes:
-      - /home/furycom/mcp-stack:/workspace
