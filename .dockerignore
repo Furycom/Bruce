@@ -1,33 +1,23 @@
-# === BRUCE .dockerignore ===
-# Created session Opus 2026-03-08, task [776]
+# === BRUCE .dockerignore (task [868]) ===
+# Build context = mcp-stack/ root
+# Whitelist approach: ignore everything, then allow what we need
 
-# Backup files
-*.bak*
-*.bak
-*.backup
-*.orig
+# Ignore everything by default
+*
 
-# Gateway backups directory
-_gateway_backups/
-_scratch_/
+# Allow only what the Dockerfile needs
+!server.js
+!shared/
+!routes/
+!mcp-gateway/package.json
+!mcp-gateway/package-lock.json
+!mcp-gateway/entrypoint.sh
+!mcp-gateway/connectors.json
+!mcp-gateway/Dockerfile
 
-# Git
-.git/
-.gitignore
-
-# Docker
-docker-compose*.yml.bak*
-Dockerfile.bak*
-
-# IDE / editor
-.vscode/
-*.swp
-*.swo
-*~
-
-# Logs
-*.log
-npm-debug.log*
-
-# Dev artifacts
-node_modules/.cache/
+# Re-exclude nested junk in allowed dirs
+**/*.bak*
+**/*.backup*
+**/*.log
+**/.git
+**/node_modules

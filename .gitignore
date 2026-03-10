@@ -34,3 +34,9 @@ sha256:*
 mcp-gateway/
 config/
 patch_ssh_keypref.py
+
+# Exception: track Dockerfile and entrypoint (but not node_modules etc)
+!mcp-gateway/Dockerfile
+!mcp-gateway/entrypoint.sh
+!mcp-gateway/package.json
+!mcp-gateway/connectors.json

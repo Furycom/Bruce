@@ -16,11 +16,11 @@ services:
     restart: unless-stopped
 
   mcp-gateway:
-
     env_file:
-
       - .env
-    build: ./mcp-gateway
+    build:
+      context: .
+      dockerfile: mcp-gateway/Dockerfile
     container_name: mcp-gateway
     restart: unless-stopped
     ports:
@@ -38,10 +38,8 @@ services:
       - BRUCE_MAX_CONCURRENT=3
       - BRUCE_FALLBACK_LOG_PATH=/workspace/mcp-gateway/bruce-fallback.log
       - BRUCE_SOURCE_DEFAULT=openwebui
-
     volumes:
       - /home/furycom/mcp-stack:/workspace
-      - /home/furycom/mcp-stack/server.js:/app/server.js:ro
       - /home/furycom/mcp-stack/shared:/app/shared:ro
       - /home/furycom/mcp-stack/routes:/app/routes:ro
       - /home/furycom/manual-docs:/manual-docs:ro

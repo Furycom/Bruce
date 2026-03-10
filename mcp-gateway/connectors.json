@@ -1,0 +1,28 @@
+{
+  "connectors": [
+    {
+      "id": "supabase_main",
+      "name": "Supabase main project",
+      "status": "ok",
+      "url": "http://192.168.2.146:3000"
+    },
+    {
+      "id": "n8n",
+      "name": "n8n automations",
+      "status": "planned",
+      "url": "http://192.168.2.231:5678"
+    },
+    {
+      "id": "openwebui",
+      "name": "OpenWebUI (furycomai)",
+      "status": "planned",
+      "url": "http://192.168.2.230:8080"
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama (furycomai)",
+      "status": "planned",
+      "url": "http://192.168.2.230:11434"
+    }
+  ]
+}

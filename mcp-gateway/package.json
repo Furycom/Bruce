@@ -1,0 +1,16 @@
+{
+  "name": "mcp-gateway",
+  "version": "1.0.0",
+  "description": "MCP Gateway for Yann's homelab",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "dockerode": "^4.0.9",
+    "express": "^4.19.2",
+    "node-ssh": "^13.2.1",
+    "sqlite3": "^5.1.7"
+  }
+}
