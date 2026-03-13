@@ -321,7 +321,7 @@ Sois direct, precis, actionnable.`;
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + (BRUCE_LITELLM_KEY || 'bruce-litellm-key-01'), 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'qwen2.5-7b',
+            model: 'alpha',
             messages: [{ role: 'user', content: prompt }],
             max_tokens: 500,
             temperature: 0.2,

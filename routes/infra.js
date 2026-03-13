@@ -285,8 +285,8 @@ router.get('/bruce/integrity', async (req, res) => {
       const r = await fetchWithTimeout('http://192.168.2.85:8081/health', {}, 4000);
       return { ok: r.status === 200 };
     }),
-    safeCheck('vllm', async () => {
-      const r = await fetchWithTimeout('http://192.168.2.32:8000/v1/models',
+    safeCheck('local-llm', async () => {
+      const r = await fetchWithTimeout('http://192.168.2.230:4100/health',
         { headers: { 'Authorization': 'Bearer ' + (BRUCE_LLM_API_KEY || 'token-abc123') } }, 5000);
       return { ok: r.status === 200 };
     }),

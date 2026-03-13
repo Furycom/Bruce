@@ -45,10 +45,10 @@ const LLM_PROFILES_FALLBACK = {
     context_format: 'narrative_concise',
     max_context_tokens: 2000
   },
-  vllm: {
-    profile_name: 'vllm',
-    display_name: 'vLLM Qwen 7B (Open WebUI)',
-    blind_spots: ['Raisonnement stratégique limité', 'Hallucine sans sources RAG'],
+  'local-llm': {
+    profile_name: 'local-llm',
+    display_name: 'llama.cpp Local LLM (Dell 7910)',
+    blind_spots: ['Raisonnement stratégique limité', 'Hallucine sans sources RAG - modele alpha via LiteLLM .230:4100'],
     tools_available: [],
     rules: ['Base ta réponse sur les sources RAG', 'Ne propose pas d\'actions techniques', 'Indique si Claude devrait traiter'],
     context_format: 'concise_factual',
@@ -61,13 +61,13 @@ const PROFILE_CACHE_TTL = 5 * 60 * 1000;
 
 function detectLLMIdentity(req) {
   const explicit = (req.headers['x-llm-identity'] || '').trim().toLowerCase();
-  if (explicit && (LLM_PROFILES_FALLBACK[explicit] || explicit === 'claude' || explicit === 'chatgpt' || explicit === 'vllm')) {
+  if (explicit && (LLM_PROFILES_FALLBACK[explicit] || explicit === 'claude' || explicit === 'chatgpt' || explicit === 'local-llm')) {
     return explicit;
   }
   const ip = bruceClientIp(req);
   if (ip.includes('192.168.2.190')) return 'claude';
   if (ip === '172.18.0.1' || ip === '::ffff:172.18.0.1') return 'chatgpt';
-  if (ip.includes('192.168.2.32')) return 'vllm';
+  if (ip.includes('192.168.2.32')) return 'local-llm'; // [902] llama.cpp Dell 7910
   const ua = (req.headers['user-agent'] || '').toLowerCase();
   if (ua.includes('powershell')) return 'claude';
   return 'claude';

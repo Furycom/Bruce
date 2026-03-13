@@ -58,7 +58,7 @@ router.post('/bruce/chatgpt', async (req, res) => {
       services_up: Object.entries(integrity.checks || {}).filter(([,v]) => v.ok).length,
       services_total: Object.keys(integrity.checks || {}).length,
       supabase: integrity.checks?.supabase?.ok ? 'up' : 'down',
-      vllm: integrity.checks?.vllm?.ok ? 'up' : 'down',
+      'local-llm': integrity.checks?.['local-llm']?.ok ? 'up' : 'down',
       gateway: 'up'
     };
 
