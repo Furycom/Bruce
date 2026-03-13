@@ -300,8 +300,8 @@ router.get('/bruce/integrity', async (req, res) => {
       return { ok: r.status === 200 };
     }),
     safeCheck('litellm', async () => {
-      const r = await fetchWithTimeout('http://172.18.0.1:4100/health',
-        { headers: { 'Authorization': 'Bearer ' + (BRUCE_LITELLM_KEY || 'bruce-litellm-key-01') } }, 4000);
+      // [902] LiteLLM /health requires auth; use / which returns 200 without auth
+      const r = await fetchWithTimeout('http://172.18.0.1:4100/', {}, 4000);
       return { ok: r.status === 200 };
     }),
     safeCheck('sequences', async () => {
