@@ -402,5 +402,90 @@ router.post('/bruce/bootstrap', async (req, res) => {
   }
 });
 
+
+// === /bruce/llm/status — Real-time LLM monitoring ===
+router.get('/bruce/llm/status', async (req, res) => {
+  const startMs = Date.now();
+  const result = {
+    ok: true,
+    timestamp: new Date().toISOString(),
+    llama_server: { status: 'unknown', model: null, slot_busy: null, n_ctx: null },
+    litellm: { status: 'unknown' },
+    dspy_job: { running: false, progress: null },
+    measured: { loading_time_s: 2, speed_tps: 2.5, ttft_ms: 4000, notes: 'Qwen3-32B Q4 ctx=16384 on Dell 7910' }
+  };
+
+  // 1. Check llama-server health + slots
+  try {
+    const healthResp = await fetchWithTimeout('http://192.168.2.32:8000/health', { method: 'GET' }, 5000);
+    if (healthResp.ok) {
+      const hData = await healthResp.json();
+      result.llama_server.status = hData.status || 'ok';
+    } else {
+      result.llama_server.status = 'unhealthy_' + healthResp.status;
+    }
+  } catch (e) {
+    result.llama_server.status = 'down';
+    result.llama_server.error = String(e.message || e).substring(0, 100);
+  }
+
+  // 2. Check slots (model loaded, busy/free)
+  try {
+    const slotResp = await fetchWithTimeout('http://192.168.2.32:8000/slots', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer token-abc123' }
+    }, 5000);
+    if (slotResp.ok) {
+      const slots = await slotResp.json();
+      if (slots && slots.length > 0) {
+        const s = slots[0];
+        result.llama_server.slot_busy = !!s.is_processing;
+        result.llama_server.n_ctx = s.n_ctx || null;
+        result.llama_server.task_id = s.id_task || null;
+        if (s.is_processing) {
+          result.llama_server.tokens_decoded = s.n_decoded || null;
+          result.llama_server.tokens_remaining = s.n_remaining || null;
+        }
+      }
+    }
+  } catch (_) {}
+
+  // 3. Get model name from /props
+  try {
+    const propsResp = await fetchWithTimeout('http://192.168.2.32:8000/props', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer token-abc123' }
+    }, 3000);
+    if (propsResp.ok) {
+      const props = await propsResp.json();
+      result.llama_server.model = props.default_generation_settings?.model || null;
+    }
+  } catch (_) {}
+
+  // 4. Check LiteLLM
+  try {
+    const liteResp = await fetchWithTimeout('http://192.168.2.230:4100/health/liveliness', { method: 'GET' }, 3000);
+    result.litellm.status = liteResp.ok ? 'ok' : 'down';
+  } catch (_) {
+    result.litellm.status = 'down';
+  }
+
+  // 5. Check if DSPy job is running (read progress file via simple heuristic)
+  // We check if the progress file was updated recently
+  try {
+    const { execSync } = require('child_process');
+    const progJson = execSync('cat /tmp/dspy_progress.json 2>/dev/null || echo "{}"', { timeout: 2000 }).toString().trim();
+    const prog = JSON.parse(progJson || '{}');
+    if (prog.timestamp && (Date.now() / 1000 - prog.timestamp) < 3600) {
+      result.dspy_job.running = true;
+      result.dspy_job.progress = prog;
+    }
+  } catch (_) {}
+
+  result.elapsed_ms = Date.now() - startMs;
+  res.json(result);
+});
+
+
 module.exports = router;
 module.exports.setSafePythonSpawn = setSafePythonSpawn;
