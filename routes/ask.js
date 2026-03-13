@@ -96,7 +96,7 @@ Reponds de facon concise et actionnable.`;
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + (BRUCE_LITELLM_KEY || 'bruce-litellm-key-01'), 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'qwen2.5-7b',
+          model: 'alpha'  // [902],
           messages: [
             { role: 'system', content: systemPrompt },
             ...conversationHistory,
