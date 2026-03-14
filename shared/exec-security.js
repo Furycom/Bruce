@@ -57,7 +57,8 @@ function validateExecCommand(cmd) {
  * Log audit entry to Supabase bruce_audit_log (fire-and-forget).
  */
 function auditLog(endpoint, caller, host, cmd, result, durationMs) {
-  return; // [840] disabled: ghost table bruce_audit_log (0 rows)
+  // DISABLED: table bruce_audit_log inexistante/vidée, voir [840].
+  return;
   if (!SUPABASE_URL || !SUPABASE_KEY) return;
 
   const base = String(SUPABASE_URL).replace(/\/+$/, '');
