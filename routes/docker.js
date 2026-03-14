@@ -13,7 +13,7 @@ const router = Router();
 // ── GET /bruce/docker/ps — list containers ──
 router.get('/bruce/docker/ps', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
-  if (!auth.ok) return res.status(401).json({ error: auth.error });
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
   try {
     const all = req.query.all !== 'false'; // default: show all
     const containers = await docker.listContainers({ all });
@@ -25,6 +25,7 @@ router.get('/bruce/docker/ps', async (req, res) => {
       status: c.Status,
       ports: (c.Ports || []).map(p => p.PublicPort ? `${p.PublicPort}->${p.PrivatePort}/${p.Type}` : `${p.PrivatePort}/${p.Type}`).filter(Boolean),
     }));
+    // TODO(contract-v2): migrate success payload to { ok: true, data } without breaking current consumers.
     res.json({ ok: true, count: compact.length, containers: compact });
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
@@ -32,7 +33,7 @@ router.get('/bruce/docker/ps', async (req, res) => {
 // ── GET /bruce/docker/inspect/:container — inspect container ──
 router.get('/bruce/docker/inspect/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
-  if (!auth.ok) return res.status(401).json({ error: auth.error });
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
   try {
     const c = docker.getContainer(req.params.container);
     const info = await c.inspect();
@@ -58,7 +59,7 @@ router.get('/bruce/docker/inspect/:container', async (req, res) => {
 // ── GET /bruce/docker/logs/:container — container logs ──
 router.get('/bruce/docker/logs/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
-  if (!auth.ok) return res.status(401).json({ error: auth.error });
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
   try {
     const tail = parseInt(req.query.tail || '50', 10);
     const c = docker.getContainer(req.params.container);
@@ -66,6 +67,7 @@ router.get('/bruce/docker/logs/:container', async (req, res) => {
     // dockerode returns Buffer, clean Docker stream headers (8-byte prefix per line)
     const raw = typeof logs === 'string' ? logs : logs.toString('utf8');
     const lines = raw.split('\n').map(l => l.replace(/^.{8}/, '').trim()).filter(Boolean);
+    // TODO(contract-v2): migrate success payload to { ok: true, data } without breaking current consumers.
     res.json({ ok: true, container: req.params.container, lines: lines.length, logs: lines });
   } catch (e) { res.status(e.statusCode === 404 ? 404 : 500).json({ ok: false, error: e.message }); }
 });
@@ -73,7 +75,7 @@ router.get('/bruce/docker/logs/:container', async (req, res) => {
 // ── GET /bruce/docker/stats/:container — container stats (one-shot) ──
 router.get('/bruce/docker/stats/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
-  if (!auth.ok) return res.status(401).json({ error: auth.error });
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
   try {
     const c = docker.getContainer(req.params.container);
     const stats = await c.stats({ stream: false });
@@ -100,7 +102,7 @@ router.get('/bruce/docker/stats/:container', async (req, res) => {
 // ── POST /bruce/docker/restart/:container — restart container ──
 router.post('/bruce/docker/restart/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
-  if (!auth.ok) return res.status(401).json({ error: auth.error });
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
   const t0 = Date.now();
   try {
     const timeout = parseInt(req.query.timeout || '10', 10);
@@ -118,7 +120,7 @@ router.post('/bruce/docker/restart/:container', async (req, res) => {
 // ── POST /bruce/docker/stop/:container — stop container ──
 router.post('/bruce/docker/stop/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
-  if (!auth.ok) return res.status(401).json({ error: auth.error });
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
   const t0 = Date.now();
   try {
     const c = docker.getContainer(req.params.container);
@@ -135,7 +137,7 @@ router.post('/bruce/docker/stop/:container', async (req, res) => {
 // ── POST /bruce/docker/start/:container — start container ──
 router.post('/bruce/docker/start/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
-  if (!auth.ok) return res.status(401).json({ error: auth.error });
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
   const t0 = Date.now();
   try {
     const c = docker.getContainer(req.params.container);
@@ -152,7 +154,7 @@ router.post('/bruce/docker/start/:container', async (req, res) => {
 // ── GET /bruce/docker/health — global health summary ──
 router.get('/bruce/docker/health', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
-  if (!auth.ok) return res.status(401).json({ error: auth.error });
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
   try {
     const containers = await docker.listContainers({ all: true });
     const summary = { total: containers.length, running: 0, stopped: 0, unhealthy: 0 };

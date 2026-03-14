@@ -129,14 +129,15 @@ router.get('/bruce/issues/open', async (req, res) => {
 
     const text = await response.text();
     if (!response.ok) {
-      return res.status(200).json({ ok: false, status: response.status, error: text || `HTTP ${response.status}` });
+      return res.status(response.status).json({ ok: false, error: text || `HTTP ${response.status}` });
     }
 
     const parsed = text ? JSON.parse(text) : null;
     const data = (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'data' in parsed) ? parsed.data : parsed;
-    return res.status(200).json({ ok: true, status: response.status, data });
+    // TODO(contract-v2): migrate success payload to { ok: true, data } without breaking current consumers.
+    return res.json({ ok: true, status: response.status, data });
   } catch (err) {
-    return res.status(200).json({ ok: false, status: 500, error: err && err.message ? err.message : String(err) });
+    return res.status(500).json({ ok: false, error: err && err.message ? err.message : String(err) });
   }
 });
 
