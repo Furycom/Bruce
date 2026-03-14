@@ -6,6 +6,13 @@ const { listMarkdownFiles, safeJoinManual } = require('../shared/helpers');
 
 const router = Router();
 
+/**
+ * Handles GET /manual/pages.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {void} Sends an HTTP response for the endpoint.
+ */
 router.get('/manual/pages', (req, res) => {
   try {
     const files = listMarkdownFiles(MANUAL_ROOT);
@@ -23,6 +30,13 @@ router.get('/manual/pages', (req, res) => {
   }
 });
 
+/**
+ * Handles GET /manual/page.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {void} Sends an HTTP response for the endpoint.
+ */
 router.get('/manual/page', (req, res) => {
   const relPath = (req.query.path || '').toString().trim();
   if (!relPath) {
@@ -62,6 +76,13 @@ router.get('/manual/page', (req, res) => {
   }
 });
 
+/**
+ * Handles GET /manual/search.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {void} Sends an HTTP response for the endpoint.
+ */
 router.get('/manual/search', (req, res) => {
   const rawQuery = (req.query.query || req.query.q || '').toString().trim();
   if (!rawQuery) {

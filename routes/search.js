@@ -6,10 +6,11 @@ const { requireScope } = require('../shared/auth');
 const router = express.Router();
 
 /**
- * POST /bruce/search
- * Proxy RAG search: embed query → pgvector hybrid search → return results.
- * Body: { query: string, top_k?: number (1-20, default 5), threshold?: number (0-1, default 0.01) }
- * Requires scope: read
+ * Handles POST / and proxies a scoped RAG search request through the embedder and Supabase RPC.
+ * Expects body params { query, top_k?, threshold? } with requireScope('read') middleware and returns ranked search matches.
+ * @param {import('express').Request} req - Express request containing search inputs in req.body.
+ * @param {import('express').Response} res - Express response used to return validation errors or search results.
+ * @returns {Promise<void>} Sends a JSON payload with search results, latency, and metadata.
  */
 router.post('/', requireScope('read'), async (req, res) => {
   const start = Date.now();

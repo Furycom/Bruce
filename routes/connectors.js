@@ -6,6 +6,13 @@ const { pingUrl } = require('../shared/helpers');
 
 const router = Router();
 
+/**
+ * Handles GET /connectors.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.get('/connectors', async (req, res) => {
   let connectors = [];
   try {

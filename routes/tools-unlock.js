@@ -7,6 +7,13 @@ const { fetchWithTimeout } = require('../shared/fetch-utils');
 
 const BASE_CAPABILITIES = ['docker', 'supabase_operationnel', 'postgresql_disponible', 'gateway_api'];
 
+/**
+ * Handles ALL /bruce/tools/unlocked.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.all('/bruce/tools/unlocked', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });

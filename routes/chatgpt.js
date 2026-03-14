@@ -7,6 +7,13 @@ const { SUPABASE_URL, SUPABASE_KEY, PORT } = require('../shared/config');
 const router = Router();
 
 // Internal fetch with timeout (same pattern as bootstrap)
+/**
+ * Internal helper function `fetchLocal`.
+ * @param {any} path - Function input parameter.
+ * @param {any} opts - Function input parameter.
+ * @param {any} timeoutMs = 10000 - Function input parameter.
+ * @returns {Promise<any>} Computed helper result.
+ */
 async function fetchLocal(path, opts, timeoutMs = 10000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -18,6 +25,13 @@ async function fetchLocal(path, opts, timeoutMs = 10000) {
   }
 }
 
+/**
+ * Handles POST /bruce/chatgpt.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/bruce/chatgpt', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });

@@ -5,6 +5,13 @@ const router = express.Router();
 const { validateBruceAuth } = require('../shared/auth');
 const { SUPABASE_URL, SUPABASE_KEY } = require('../shared/config');
 
+/**
+ * Handles POST /bruce/read.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post("/bruce/read", async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
@@ -48,6 +55,13 @@ router.post("/bruce/read", async (req, res) => {
   }
 });
 
+/**
+ * Handles GET /bruce/roadmap/list.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.get('/bruce/roadmap/list', async (req, res) => {
   const startMs = Date.now();
   try {

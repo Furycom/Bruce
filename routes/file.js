@@ -9,6 +9,13 @@ const path = require('path');
 // Allowed base directories (security: no writing outside these)
 const ALLOWED_BASES = ['/tmp', '/home/furycom'];
 
+/**
+ * Handles POST /bruce/file/write.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/bruce/file/write', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -64,6 +71,13 @@ router.post('/bruce/file/write', async (req, res) => {
 });
 
 // GET /bruce/file/read — Read file content from .230 filesystem
+/**
+ * Handles GET /bruce/file/read.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.get('/bruce/file/read', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });

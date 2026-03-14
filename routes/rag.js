@@ -23,6 +23,12 @@ const BRUCE_RAG_METRICS = {
   context:{ calls: 0, ok: 0, err: 0, last_ms: null, avg_ms: null, total_ms: 0, last_error: null }
 };
 
+/**
+ * Internal helper function `bruceRagMetricOk`.
+ * @param {any} name - Function input parameter.
+ * @param {any} ms - Function input parameter.
+ * @returns {any} Computed helper result.
+ */
 function bruceRagMetricOk(name, ms) {
   const m = BRUCE_RAG_METRICS[name];
   if (!m) return;
@@ -33,6 +39,13 @@ function bruceRagMetricOk(name, ms) {
   m.last_error = null;
 }
 
+/**
+ * Internal helper function `bruceRagMetricErr`.
+ * @param {any} name - Function input parameter.
+ * @param {any} ms - Function input parameter.
+ * @param {any} err - Function input parameter.
+ * @returns {any} Computed helper result.
+ */
 function bruceRagMetricErr(name, ms, err) {
   const m = BRUCE_RAG_METRICS[name];
   if (!m) return;
@@ -41,6 +54,11 @@ function bruceRagMetricErr(name, ms, err) {
   m.last_error = String(err || "").slice(0, 400);
 }
 
+/**
+ * Internal helper function `__ragRate`.
+ * @param {any} ( - Function input parameter.
+ * @returns {any} Computed helper result.
+ */
 const __ragRate = (() => {
   const m = new Map();
   return {
@@ -61,6 +79,12 @@ const __ragRate = (() => {
   };
 })();
 
+/**
+ * Internal helper function `bruceRagRateLimitOr429`.
+ * @param {any} req - Function input parameter.
+ * @param {any} res - Function input parameter.
+ * @returns {any} Computed helper result.
+ */
 function bruceRagRateLimitOr429(req, res) {
   const ip = bruceClientIp(req);
   const r = __ragRate.check(ip);
@@ -77,6 +101,13 @@ function bruceRagRateLimitOr429(req, res) {
 // --- ROUTE HANDLERS ---
 
 // GET /bruce/rag/metrics
+/**
+ * Handles GET /bruce/rag/metrics.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {void} Sends an HTTP response for the endpoint.
+ */
 router.get("/bruce/rag/metrics", (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -86,6 +117,13 @@ router.get("/bruce/rag/metrics", (req, res) => {
 // POST /bruce/rag/search
 
 // POST /bruce/rag/search
+/**
+ * Handles POST /bruce/rag/search.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post("/bruce/rag/search", async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -215,6 +253,13 @@ router.post("/bruce/rag/search", async (req, res) => {
 });
 
 // POST /bruce/tool-check
+/**
+ * Handles POST /bruce/tool-check.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post("/bruce/tool-check", async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -293,6 +338,13 @@ router.post("/bruce/tool-check", async (req, res) => {
 });
 
 // POST /bruce/rag/context
+/**
+ * Handles POST /bruce/rag/context.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post("/bruce/rag/context", async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -416,6 +468,12 @@ router.post("/bruce/rag/context", async (req, res) => {
 });
 
 // --- bruceRagContext helper (used by chat.js and session/init) ---
+/**
+ * Internal helper function `bruceRagContext`.
+ * @param {any} qtext - Function input parameter.
+ * @param {any} k - Function input parameter.
+ * @returns {Promise<any>} Computed helper result.
+ */
 async function bruceRagContext(qtext, k) {
   const q = String(qtext || "").trim();
   const kRaw = parseInt(String(k ?? "8"), 10);
@@ -484,6 +542,13 @@ async function bruceRagContext(qtext, k) {
 }
 
 // POST /tools/rag/search
+/**
+ * Handles POST /tools/rag/search.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/tools/rag/search', async (req, res) => {
   const { query, top_k = 5, min_similarity = 0.5 } = req.body || {};
   if (!query) return res.status(400).json({ ok: false, error: 'query required' });
@@ -516,6 +581,13 @@ router.post('/tools/rag/search', async (req, res) => {
 });
 
 // POST /bruce/preflight
+/**
+ * Handles POST /bruce/preflight.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/bruce/preflight', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
