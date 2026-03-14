@@ -8,8 +8,20 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const { validateBruceAuth } = require('../shared/auth');
 const {
-  SUPABASE_URL, SUPABASE_KEY, MANUAL_ROOT, PORT, BRUCE_AUTH_TOKEN,
-  BRUCE_LLM_API_KEY, BRUCE_LITELLM_KEY
+  SUPABASE_URL,
+  SUPABASE_KEY,
+  MANUAL_ROOT,
+  PORT,
+  BRUCE_AUTH_TOKEN,
+  BRUCE_LLM_API_KEY,
+  BRUCE_LITELLM_KEY,
+  EMBEDDER_URL,
+  LITELLM_URL,
+  VALIDATE_SERVICE_URL,
+  MCP_PLAYWRIGHT_URL,
+  VLLM_INTERNAL_URL,
+  LOOPBACK_BASE_URL,
+  LOCAL_LLM_URL,
 } = require('../shared/config');
 const { pingUrl } = require('../shared/helpers');
 const { fetchWithTimeout } = require('../shared/fetch-utils');
@@ -282,26 +294,26 @@ router.get('/bruce/integrity', async (req, res) => {
       return { ok: true, count: Array.isArray(d) ? d.length : -1 };
     }),
     safeCheck('embedder', async () => {
-      const r = await fetchWithTimeout('http://192.168.2.85:8081/health', {}, 4000);
+      const r = await fetchWithTimeout(EMBEDDER_URL + '/health', {}, 4000);
       return { ok: r.status === 200 };
     }),
     safeCheck('local-llm', async () => {
-      const r = await fetchWithTimeout('http://192.168.2.230:4100/health',
+      const r = await fetchWithTimeout(LITELLM_URL + '/health',
         { headers: { 'Authorization': 'Bearer ' + (BRUCE_LLM_API_KEY || 'token-abc123') } }, 5000);
       return { ok: r.status === 200 };
     }),
     safeCheck('validate_service', async () => {
-      const r = await fetchWithTimeout('http://172.18.0.1:4001/health', {}, 4000);
+      const r = await fetchWithTimeout(VALIDATE_SERVICE_URL + '/health', {}, 4000);
       const d = await r.json();
       return { ok: d.ok === true };
     }),
     safeCheck('n8n', async () => {
-      const r = await fetchWithTimeout('http://192.168.2.174:5678/healthz', {}, 4000);
+      const r = await fetchWithTimeout(MCP_PLAYWRIGHT_URL + '/healthz', {}, 4000);
       return { ok: r.status === 200 };
     }),
     safeCheck('litellm', async () => {
       // [902] LiteLLM /health requires auth; use / which returns 200 without auth
-      const r = await fetchWithTimeout('http://172.18.0.1:4100/', {}, 4000);
+      const r = await fetchWithTimeout(VLLM_INTERNAL_URL + '/', {}, 4000);
       return { ok: r.status === 200 };
     }),
     safeCheck('sequences', async () => {
@@ -368,8 +380,8 @@ router.post('/bruce/bootstrap', async (req, res) => {
   try {
     // Run integrity + session/init in PARALLEL via internal loopback
     const [integrityRes, sessionRes] = await Promise.all([
-      fetchWithTimeout('http://127.0.0.1:' + PORT + '/bruce/integrity', { headers: hGw }, 10000),
-      fetchWithTimeout('http://127.0.0.1:' + PORT + '/bruce/session/init', {
+      fetchWithTimeout(LOOPBACK_BASE_URL + ':' + PORT + '/bruce/integrity', { headers: hGw }, 10000),
+      fetchWithTimeout(LOOPBACK_BASE_URL + ':' + PORT + '/bruce/session/init', {
         method: 'POST',
         headers: hGw,
         body: JSON.stringify({ topic, scope: 'homelab,general', profile, include_tasks: includeTasks, include_lessons: includeLessons, include_state: includeState })
@@ -421,7 +433,7 @@ router.get('/bruce/llm/status', async (req, res) => {
 
   // 1. Check llama-server health + slots
   try {
-    const healthResp = await fetchWithTimeout('http://192.168.2.32:8000/health', { method: 'GET' }, 5000);
+    const healthResp = await fetchWithTimeout(LOCAL_LLM_URL + '/health', { method: 'GET' }, 5000);
     if (healthResp.ok) {
       const hData = await healthResp.json();
       result.llama_server.status = hData.status || 'ok';
@@ -435,7 +447,7 @@ router.get('/bruce/llm/status', async (req, res) => {
 
   // 2. Check slots (model loaded, busy/free)
   try {
-    const slotResp = await fetchWithTimeout('http://192.168.2.32:8000/slots', {
+    const slotResp = await fetchWithTimeout(LOCAL_LLM_URL + '/slots', {
       method: 'GET',
       headers: { 'Authorization': 'Bearer token-abc123' }
     }, 5000);
@@ -458,7 +470,7 @@ router.get('/bruce/llm/status', async (req, res) => {
 
   // 3. Get model name from /props
   try {
-    const propsResp = await fetchWithTimeout('http://192.168.2.32:8000/props', {
+    const propsResp = await fetchWithTimeout(LOCAL_LLM_URL + '/props', {
       method: 'GET',
       headers: { 'Authorization': 'Bearer token-abc123' }
     }, 3000);
@@ -472,7 +484,7 @@ router.get('/bruce/llm/status', async (req, res) => {
 
   // 4. Check LiteLLM
   try {
-    const liteResp = await fetchWithTimeout('http://192.168.2.230:4100/health/liveliness', { method: 'GET' }, 3000);
+    const liteResp = await fetchWithTimeout(LITELLM_URL + '/health/liveliness', { method: 'GET' }, 3000);
     result.litellm.status = liteResp.ok ? 'ok' : 'down';
   } catch (_) {
     result.litellm.status = 'down';

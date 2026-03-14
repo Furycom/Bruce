@@ -2,7 +2,14 @@
 // Compact bootstrap for ChatGPT: <2000 tokens, read-only, pre-filled commands
 const { Router } = require('express');
 const { validateBruceAuth } = require('../shared/auth');
-const { SUPABASE_URL, SUPABASE_KEY, PORT } = require('../shared/config');
+const {
+  SUPABASE_URL,
+  SUPABASE_KEY,
+  PORT,
+  LOOPBACK_BASE_URL,
+  SUPABASE_REST_FALLBACK_URL,
+  GATEWAY_PUBLIC_URL,
+} = require('../shared/config');
 
 const router = Router();
 
@@ -11,7 +18,7 @@ async function fetchLocal(path, opts, timeoutMs = 10000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`http://127.0.0.1:${PORT}${path}`, { ...opts, signal: controller.signal });
+    const res = await fetch(`${LOOPBACK_BASE_URL}:${PORT}${path}`, { ...opts, signal: controller.signal });
     return res;
   } finally {
     clearTimeout(timer);
@@ -36,7 +43,7 @@ router.post('/bruce/chatgpt', async (req, res) => {
       'Authorization': `Bearer ${SUPABASE_KEY}`,
     };
     // SUPABASE_URL already includes /rest/v1
-    const supaBase = SUPABASE_URL || 'http://192.168.2.146:8000/rest/v1';
+    const supaBase = SUPABASE_URL || SUPABASE_REST_FALLBACK_URL;
 
     const [integrityRes, tasksRes] = await Promise.all([
       fetchLocal('/bruce/integrity', { headers: hGw }, 8000),
@@ -80,7 +87,7 @@ router.post('/bruce/chatgpt', async (req, res) => {
       recent_lessons: `curl -s '${supaBase}/lessons_learned?importance=eq.critical&order=created_at.desc&limit=5' -H 'apikey: ${SUPABASE_KEY}' -H 'Authorization: Bearer ${SUPABASE_KEY}' | python3 -m json.tool`,
       staging_status: `curl -s '${supaBase}/staging_queue?status=eq.pending&order=created_at.desc&limit=5' -H 'apikey: ${SUPABASE_KEY}' -H 'Authorization: Bearer ${SUPABASE_KEY}' | python3 -m json.tool`,
       push_to_staging: `curl -s -X POST '${supaBase}/staging_queue' -H 'apikey: ${SUPABASE_KEY}' -H 'Authorization: Bearer ${SUPABASE_KEY}' -H 'Content-Type: application/json' -d '{"table_cible":"lessons_learned","contenu_json":{"lesson_type":"discovery","lesson_text":"TEXTE_ICI","importance":"normal","confidence_score":0.7,"author_system":"claude","project_scope":"homelab"},"author_system":"claude","notes":"via ChatGPT"}'`,
-      integrity_check: `curl -s http://192.168.2.230:4000/bruce/integrity -H 'Authorization: Bearer bruce-secret-token-01' | python3 -m json.tool`
+      integrity_check: `curl -s ${GATEWAY_PUBLIC_URL}/bruce/integrity -H 'Authorization: Bearer bruce-secret-token-01' | python3 -m json.tool`
     };
 
     // Forbidden actions list

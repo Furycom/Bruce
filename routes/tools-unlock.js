@@ -2,7 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const { validateBruceAuth } = require('../shared/auth');
-const { SUPABASE_URL, SUPABASE_KEY } = require('../shared/config');
+const {
+  SUPABASE_URL,
+  SUPABASE_KEY,
+  EMBEDDER_URL,
+  LOCAL_LLM_URL,
+  LITELLM_URL,
+  VALIDATE_PUBLIC_URL,
+} = require('../shared/config');
 const { fetchWithTimeout } = require('../shared/fetch-utils');
 
 const BASE_CAPABILITIES = ['docker', 'supabase_operationnel', 'postgresql_disponible', 'gateway_api'];
@@ -28,10 +35,10 @@ router.all('/bruce/tools/unlocked', async (req, res) => {
     if (caps.length === 0) {
       caps = [...BASE_CAPABILITIES];
       const checks = [
-        { url: 'http://192.168.2.85:8081/health', caps: ['embedder_bge_m3', 'embedding_1024d'] },
-        { url: 'http://192.168.2.32:8000/health', caps: ['inference_locale', 'gpu_nvidia', 'dell_7910_operationnel', 'modele_capable_32b'] },
-        { url: 'http://192.168.2.230:4100/health/liveliness', caps: ['litellm_proxy', 'litellm_callback_configured'] },
-        { url: 'http://192.168.2.230:4001/health', caps: ['validate_pipeline_ok', 'validate_service_http'] },
+        { url: EMBEDDER_URL + '/health', caps: ['embedder_bge_m3', 'embedding_1024d'] },
+        { url: LOCAL_LLM_URL + '/health', caps: ['inference_locale', 'gpu_nvidia', 'dell_7910_operationnel', 'modele_capable_32b'] },
+        { url: LITELLM_URL + '/health/liveliness', caps: ['litellm_proxy', 'litellm_callback_configured'] },
+        { url: VALIDATE_PUBLIC_URL + '/health', caps: ['validate_pipeline_ok', 'validate_service_http'] },
       ];
       await Promise.all(checks.map(async (c) => {
         try {

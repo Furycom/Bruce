@@ -3,7 +3,12 @@
 const express = require('express');
 const router = express.Router();
 const { validateBruceAuth } = require('../shared/auth');
-const { SUPABASE_URL, SUPABASE_KEY, BRUCE_AUTH_TOKEN } = require('../shared/config');
+const {
+  SUPABASE_URL,
+  SUPABASE_KEY,
+  BRUCE_AUTH_TOKEN,
+  VALIDATE_SERVICE_URL,
+} = require('../shared/config');
 const { fetchWithTimeout } = require('../shared/fetch-utils');
 
 router.post('/bruce/write', async (req, res) => {
@@ -60,7 +65,7 @@ router.post('/bruce/write', async (req, res) => {
     if (shouldValidate) {
       try {
         const valRes = await fetchWithTimeout(
-          'http://172.18.0.1:4001/run/validate',
+          VALIDATE_SERVICE_URL + '/run/validate',
           { method: 'POST', headers: { 'X-BRUCE-TOKEN': String(process.env.BRUCE_AUTH_TOKEN || 'bruce-secret-token-01') } },
           20000
         );
