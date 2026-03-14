@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { validateBruceAuth } = require('../shared/auth');
-const { BRUCE_AUTH_TOKEN } = require('../shared/config');
+const { BRUCE_AUTH_TOKEN, BRUCE_RUNNER_URL } = require('../shared/config');
 
 router.get('/bruce/inbox/check', async (req, res) => {
   const auth = validateBruceAuth(req);
@@ -36,7 +36,7 @@ router.post('/bruce/inbox/ingest', async (req, res) => {
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
 
   // [FIX session 1002] Proxy to host inbox_http_runner.py on port 4002
-  const RUNNER_URL = 'http://172.18.0.1:4002/inbox/ingest';
+  const RUNNER_URL = `${BRUCE_RUNNER_URL}/inbox/ingest`;
   try {
     const resp = await fetch(RUNNER_URL, {
       method: 'POST',

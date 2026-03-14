@@ -1,6 +1,7 @@
 'use strict';
 const { Router } = require('express');
 const { validateBruceAuth } = require('../shared/auth');
+const { MCP_GATEWAY_PUBLIC_URL } = require('../shared/config');
 const router = Router();
 
 router.get('/admin', (req, res) => {
@@ -40,8 +41,8 @@ router.get('/admin', (req, res) => {
         <li><code>GET /connectors</code> – Status of configured connectors</li>
       </ul>
       <p>Example:</p>
-      <pre><code>curl http://192.168.2.230:4000/health
-curl http://192.168.2.230:4000/connectors</code></pre>
+      <pre><code>curl ${MCP_GATEWAY_PUBLIC_URL}/health
+curl ${MCP_GATEWAY_PUBLIC_URL}/connectors</code></pre>
     </section>
 
     <section class="card">
@@ -53,7 +54,7 @@ curl http://192.168.2.230:4000/connectors</code></pre>
         <li><code>POST /tools/supabase/exec-sql</code> – Execute SQL via Supabase RPC</li>
       </ul>
       <p>Example:</p>
-      <pre><code>curl -X POST http://192.168.2.230:4000/tools/echo \\
+      <pre><code>curl -X POST ${MCP_GATEWAY_PUBLIC_URL}/tools/echo \\
   -H "Content-Type: application/json" \\
   -d '{"message": "hello from MCP"}'</code></pre>
     </section>
@@ -67,9 +68,9 @@ curl http://192.168.2.230:4000/connectors</code></pre>
         <li><code>GET /manual/search?query=furyai</code> – Search the manual</li>
       </ul>
       <p>Examples:</p>
-      <pre><code>curl "http://192.168.2.230:4000/manual/pages"
-curl "http://192.168.2.230:4000/manual/page?path=vms/mcp-gateway-vm.md"
-curl "http://192.168.2.230:4000/manual/search?query=furyai"</code></pre>
+      <pre><code>curl "${MCP_GATEWAY_PUBLIC_URL}/manual/pages"
+curl "${MCP_GATEWAY_PUBLIC_URL}/manual/page?path=vms/mcp-gateway-vm.md"
+curl "${MCP_GATEWAY_PUBLIC_URL}/manual/search?query=furyai"</code></pre>
       <p class="small">These endpoints are designed to be used by local LLMs via the MCP ecosystem, not exposed to the public internet.</p>
     </section>
   </main>

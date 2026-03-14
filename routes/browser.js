@@ -1,7 +1,7 @@
 'use strict';
 const { Router } = require('express');
 
-const BROWSERLESS_URL = process.env.BROWSERLESS_URL || 'http://192.168.2.174:3000';
+const { BROWSERLESS_URL } = require('../shared/config');
 
 const router = Router();
 

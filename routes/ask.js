@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const { validateBruceAuth } = require('../shared/auth');
-const { SUPABASE_URL, SUPABASE_KEY, BRUCE_LITELLM_KEY } = require('../shared/config');
+const { SUPABASE_URL, SUPABASE_KEY, BRUCE_LITELLM_KEY, EMBEDDER_URL, LITELLM_URL } = require('../shared/config');
 const { fetchWithTimeout } = require('../shared/fetch-utils');
 const { detectLLMIdentity, loadLLMProfile, BRUCE_OPERATING_PRINCIPLES } = require('../shared/llm-profiles');
 
@@ -44,7 +44,7 @@ router.post('/bruce/ask', async (req, res) => {
   let ragError = null;
   try {
     const embedRes = await fetchWithTimeout(
-      'http://192.168.2.85:8081/embed',
+      `${EMBEDDER_URL}/embed`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inputs: question, max_length: 512 }) },
       8000
     );
@@ -91,7 +91,7 @@ Reponds de facon concise et actionnable.`;
 
   try {
     const llmRes = await fetchWithTimeout(
-      'http://192.168.2.230:4100/v1/chat/completions',
+      `${LITELLM_URL}/v1/chat/completions`,
       {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + (BRUCE_LITELLM_KEY || 'bruce-litellm-key-01'), 'Content-Type': 'application/json' },

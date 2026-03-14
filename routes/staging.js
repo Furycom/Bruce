@@ -1,6 +1,6 @@
 'use strict';
 const { Router } = require('express');
-const { SUPABASE_URL, SUPABASE_KEY } = require('../shared/config');
+const { SUPABASE_URL, SUPABASE_KEY, VALIDATE_SERVICE_URL } = require('../shared/config');
 const { validateBruceAuth } = require('../shared/auth');
 
 const router = Router();
@@ -10,7 +10,7 @@ router.post('/bruce/staging/validate', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(401).json({ error: auth.error });
   try {
-    const r = await fetch('http://172.18.0.1:4001/run/validate', {
+    const r = await fetch(`${VALIDATE_SERVICE_URL}/run/validate`, {
       method: 'POST',
       headers: { 'X-BRUCE-TOKEN': 'bruce-secret-token-01', 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(65000)
