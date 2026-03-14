@@ -324,7 +324,7 @@ router.get('/bruce/integrity', async (req, res) => {
       new Promise((_, reject) => setTimeout(() => reject(new Error('global_integrity_timeout')), GLOBAL_TIMEOUT_MS))
     ]);
   } catch (e) {
-    return res.json({
+    return res.status(500).json({
       ok: false, generated_at: new Date().toISOString(),
       checks: { _timeout: { ok: false, error: 'Global timeout after ' + GLOBAL_TIMEOUT_MS + 'ms' } },
       elapsed_ms: Date.now() - globalStart,
