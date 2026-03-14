@@ -4,7 +4,13 @@ const express = require('express');
 const router = express.Router();
 const { validateBruceAuth } = require('../shared/auth');
 const {
-  SUPABASE_URL, SUPABASE_KEY, BRUCE_AUTH_TOKEN, BRUCE_LITELLM_KEY
+  SUPABASE_URL,
+  SUPABASE_KEY,
+  BRUCE_AUTH_TOKEN,
+  BRUCE_LITELLM_KEY,
+  EMBEDDER_URL,
+  LITELLM_URL,
+  VALIDATE_SERVICE_URL,
 } = require('../shared/config');
 const { fetchWithTimeout } = require('../shared/fetch-utils');
 const { bruceRagContext } = require('./rag');
@@ -107,7 +113,7 @@ router.post('/bruce/session/init', async (req, res) => {
     const embedAndSearch = async (queryText) => {
       try {
         const embedRes = await fetchWithTimeout(
-          'http://192.168.2.85:8081/embed',
+          EMBEDDER_URL + '/embed',
           { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ inputs: queryText, max_length: 256 }) },
           6000
@@ -320,7 +326,7 @@ Sois direct, precis, actionnable.`;
     try {
       // [730] Route via LiteLLM proxy (was direct vLLM .32:8000)
       const llmRes = await fetchWithTimeout(
-        'http://192.168.2.230:4100/v1/chat/completions',
+        LITELLM_URL + '/v1/chat/completions',
         {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + (BRUCE_LITELLM_KEY || 'bruce-litellm-key-01'), 'Content-Type': 'application/json' },
@@ -986,7 +992,7 @@ router.post('/bruce/session/close', async (req, res) => {
     if (pendingCount > 0) {
       try {
         const valRes = await fetchWithTimeout(
-          'http://172.18.0.1:4001/run/validate',
+          VALIDATE_SERVICE_URL + '/run/validate',
           { method: 'POST', headers: { 'X-BRUCE-TOKEN': (BRUCE_AUTH_TOKEN || 'bruce-secret-token-01'), 'Content-Type': 'application/json' } },
           65000
         );
