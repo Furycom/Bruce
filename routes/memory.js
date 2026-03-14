@@ -71,21 +71,21 @@ router.post('/bruce/memory/append', async (req, res) => {
     const text = await response.text();
 
     if (!response.ok) {
-      return res.status(200).json({ ok: false, status: response.status, error: text || ('HTTP ' + response.status) });
+      return res.status(response.status).json({ ok: false, error: text || ('HTTP ' + response.status) });
     }
 
     let parsed = null;
     try {
       parsed = text ? JSON.parse(text) : null;
     } catch (e) {
-      return res.status(200).json({ ok: false, status: 500, error: 'JSON parse error', raw: text });
+      return res.status(500).json({ ok: false, error: 'JSON parse error' });
     }
 
     const inserted = (Array.isArray(parsed) && parsed.length) ? parsed[0] : parsed;
 
-    return res.status(200).json({ ok: true, inserted, timestamp: new Date().toISOString() });
+    return res.json({ ok: true, data: { inserted, timestamp: new Date().toISOString() } });
   } catch (err) {
-    return res.status(200).json({ ok: false, status: 500, error: err && err.message ? err.message : String(err) });
+    return res.status(500).json({ ok: false, error: err && err.message ? err.message : String(err) });
   }
 });
 

@@ -39,10 +39,10 @@ router.post("/bruce/read", async (req, res) => {
     }
 
     const text = lastText || "";
-    if (!r.ok) return res.status(r.status).send(text);
+    if (!r.ok) return res.status(r.status).json({ ok: false, error: text || ('Supabase error ' + r.status) });
 
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    return res.send(text);
+    return res.json({ ok: true, data: text ? JSON.parse(text) : null });
   } catch (e) {
     return res.status(500).json({ ok: false, error: String(e && e.message ? e.message : e) });
   }
@@ -57,9 +57,11 @@ router.get('/bruce/roadmap/list', async (req, res) => {
     const tasks = await resp.json();
     return res.json({
       ok: true,
-      count: tasks.length,
-      elapsed_ms: Date.now() - startMs,
-      tasks
+      data: {
+        count: tasks.length,
+        elapsed_ms: Date.now() - startMs,
+        tasks
+      }
     });
   } catch (err) {
     console.error('[/bruce/roadmap/list]', err.message);
