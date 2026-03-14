@@ -6,6 +6,13 @@ const { listMarkdownFiles, safeJoinManual } = require('../shared/helpers');
 
 const router = Router();
 
+/**
+ * Handles GET /manual/pages.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/manual/pages', (req, res) => {
   try {
     const files = listMarkdownFiles(MANUAL_ROOT);
@@ -23,6 +30,13 @@ router.get('/manual/pages', (req, res) => {
   }
 });
 
+/**
+ * Handles GET /manual/page.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/manual/page', (req, res) => {
   const relPath = (req.query.path || '').toString().trim();
   if (!relPath) {
@@ -62,6 +76,13 @@ router.get('/manual/page', (req, res) => {
   }
 });
 
+/**
+ * Handles GET /manual/search.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/manual/search', (req, res) => {
   const rawQuery = (req.query.query || req.query.q || '').toString().trim();
   if (!rawQuery) {

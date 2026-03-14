@@ -28,8 +28,20 @@ const { fetchWithTimeout } = require('../shared/fetch-utils');
 
 // safePythonSpawn injected from server.js via module.exports function
 let _safePythonSpawn = null;
+/**
+ * setSafePythonSpawn internal helper.
+ * @param {any} fn - Function input parameter.
+ * @returns {any} Helper return value used by route handlers.
+ */
 function setSafePythonSpawn(fn) { _safePythonSpawn = fn; }
 
+/**
+ * Handles GET /health.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/health', async (req, res) => {
   const result = {
     status: 'ok',
@@ -71,10 +83,24 @@ router.get('/health', async (req, res) => {
   res.json(result);
 });
 
+/**
+ * Handles GET /bruce/health.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/health', (req, res) => {
   return res.redirect(307, '/health');
 });
 
+/**
+ * Handles GET /bruce/state.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/state', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -111,6 +137,13 @@ router.get('/bruce/state', async (req, res) => {
   }
 });
 
+/**
+ * Handles GET /bruce/issues/open.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/issues/open', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status).json({ ok: false, error: auth.error });
@@ -153,6 +186,13 @@ router.get('/bruce/issues/open', async (req, res) => {
   }
 });
 
+/**
+ * Handles GET /bruce/topology.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/topology', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -214,6 +254,13 @@ router.get('/bruce/topology', async (req, res) => {
   }
 });
 
+/**
+ * Handles POST /bruce/maintenance/run.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/maintenance/run', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -243,6 +290,13 @@ router.post('/bruce/maintenance/run', async (req, res) => {
   }
 });
 
+/**
+ * Handles POST /bruce/sync/homelab-hub.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/sync/homelab-hub', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -260,6 +314,13 @@ router.post('/bruce/sync/homelab-hub', async (req, res) => {
   }
 });
 
+/**
+ * Handles GET /bruce/integrity.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/integrity', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -271,6 +332,12 @@ router.get('/bruce/integrity', async (req, res) => {
   const GLOBAL_TIMEOUT_MS = 8000;
   const globalStart = Date.now();
 
+  /**
+   * safeCheck internal helper.
+   * @param {any} name - Function input parameters.
+   * @param {any} fn - Additional function input parameter.
+   * @returns {any} Helper return value used by route handlers.
+   */
   async function safeCheck(name, fn) {
     try {
       const result = await Promise.race([
@@ -363,6 +430,13 @@ router.get('/bruce/integrity', async (req, res) => {
   });
 });
 
+/**
+ * Handles POST /bruce/bootstrap.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/bootstrap', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -421,6 +495,13 @@ router.post('/bruce/bootstrap', async (req, res) => {
 
 
 // === /bruce/llm/status — Real-time LLM monitoring ===
+/**
+ * Handles GET /bruce/llm/status.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/llm/status', async (req, res) => {
   const startMs = Date.now();
   const result = {

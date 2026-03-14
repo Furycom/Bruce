@@ -23,6 +23,12 @@ const BRUCE_RAG_METRICS = {
   context:{ calls: 0, ok: 0, err: 0, last_ms: null, avg_ms: null, total_ms: 0, last_error: null }
 };
 
+/**
+ * bruceRagMetricOk internal helper.
+ * @param {any} name - Function input parameters.
+ * @param {any} ms - Additional function input parameter.
+ * @returns {any} Helper return value used by route handlers.
+ */
 function bruceRagMetricOk(name, ms) {
   const m = BRUCE_RAG_METRICS[name];
   if (!m) return;
@@ -33,6 +39,13 @@ function bruceRagMetricOk(name, ms) {
   m.last_error = null;
 }
 
+/**
+ * bruceRagMetricErr internal helper.
+ * @param {any} name - Function input parameters.
+ * @param {any} ms - Additional function input parameter.
+ * @param {any} err - Additional function input parameter.
+ * @returns {any} Helper return value used by route handlers.
+ */
 function bruceRagMetricErr(name, ms, err) {
   const m = BRUCE_RAG_METRICS[name];
   if (!m) return;
@@ -41,6 +54,11 @@ function bruceRagMetricErr(name, ms, err) {
   m.last_error = String(err || "").slice(0, 400);
 }
 
+/**
+ * __ragRate internal helper.
+ * @param {any} ( - Function input parameter.
+ * @returns {any} Helper return value used by route handlers.
+ */
 const __ragRate = (() => {
   const m = new Map();
   return {
@@ -61,6 +79,12 @@ const __ragRate = (() => {
   };
 })();
 
+/**
+ * bruceRagRateLimitOr429 internal helper.
+ * @param {any} req - Function input parameters.
+ * @param {any} res - Additional function input parameter.
+ * @returns {any} Helper return value used by route handlers.
+ */
 function bruceRagRateLimitOr429(req, res) {
   const ip = bruceClientIp(req);
   const r = __ragRate.check(ip);
@@ -77,6 +101,13 @@ function bruceRagRateLimitOr429(req, res) {
 // --- ROUTE HANDLERS ---
 
 // GET /bruce/rag/metrics
+/**
+ * Handles GET /bruce/rag/metrics.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get("/bruce/rag/metrics", (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -86,6 +117,13 @@ router.get("/bruce/rag/metrics", (req, res) => {
 // POST /bruce/rag/search
 
 // POST /bruce/rag/search
+/**
+ * Handles POST /bruce/rag/search.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post("/bruce/rag/search", async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -215,6 +253,13 @@ router.post("/bruce/rag/search", async (req, res) => {
 });
 
 // POST /bruce/tool-check
+/**
+ * Handles POST /bruce/tool-check.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post("/bruce/tool-check", async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -293,6 +338,13 @@ router.post("/bruce/tool-check", async (req, res) => {
 });
 
 // POST /bruce/rag/context
+/**
+ * Handles POST /bruce/rag/context.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post("/bruce/rag/context", async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -416,6 +468,12 @@ router.post("/bruce/rag/context", async (req, res) => {
 });
 
 // --- bruceRagContext helper (used by chat.js and session/init) ---
+/**
+ * bruceRagContext internal helper.
+ * @param {any} qtext - Function input parameters.
+ * @param {any} k - Additional function input parameter.
+ * @returns {any} Helper return value used by route handlers.
+ */
 async function bruceRagContext(qtext, k) {
   const q = String(qtext || "").trim();
   const kRaw = parseInt(String(k ?? "8"), 10);
@@ -484,6 +542,13 @@ async function bruceRagContext(qtext, k) {
 }
 
 // POST /tools/rag/search
+/**
+ * Handles POST /tools/rag/search.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/tools/rag/search', async (req, res) => {
   const { query, top_k = 5, min_similarity = 0.5 } = req.body || {};
   if (!query) return res.status(400).json({ ok: false, error: 'query required' });
@@ -516,6 +581,13 @@ router.post('/tools/rag/search', async (req, res) => {
 });
 
 // POST /bruce/preflight
+/**
+ * Handles POST /bruce/preflight.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/preflight', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });

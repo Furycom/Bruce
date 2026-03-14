@@ -11,6 +11,13 @@ const router = Router();
 // router.use(requireScope('docker'));
 
 // ── GET /bruce/docker/ps — list containers ──
+/**
+ * Handles GET /bruce/docker/ps.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/docker/ps', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
@@ -31,6 +38,13 @@ router.get('/bruce/docker/ps', async (req, res) => {
 });
 
 // ── GET /bruce/docker/inspect/:container — inspect container ──
+/**
+ * Handles GET /bruce/docker/inspect/:container.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/docker/inspect/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
@@ -57,6 +71,13 @@ router.get('/bruce/docker/inspect/:container', async (req, res) => {
 });
 
 // ── GET /bruce/docker/logs/:container — container logs ──
+/**
+ * Handles GET /bruce/docker/logs/:container.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/docker/logs/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
@@ -73,6 +94,13 @@ router.get('/bruce/docker/logs/:container', async (req, res) => {
 });
 
 // ── GET /bruce/docker/stats/:container — container stats (one-shot) ──
+/**
+ * Handles GET /bruce/docker/stats/:container.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/docker/stats/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
@@ -100,6 +128,13 @@ router.get('/bruce/docker/stats/:container', async (req, res) => {
 });
 
 // ── POST /bruce/docker/restart/:container — restart container ──
+/**
+ * Handles POST /bruce/docker/restart/:container.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/docker/restart/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
@@ -118,6 +153,13 @@ router.post('/bruce/docker/restart/:container', async (req, res) => {
 });
 
 // ── POST /bruce/docker/stop/:container — stop container ──
+/**
+ * Handles POST /bruce/docker/stop/:container.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/docker/stop/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
@@ -135,6 +177,13 @@ router.post('/bruce/docker/stop/:container', async (req, res) => {
 });
 
 // ── POST /bruce/docker/start/:container — start container ──
+/**
+ * Handles POST /bruce/docker/start/:container.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/docker/start/:container', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
@@ -152,6 +201,13 @@ router.post('/bruce/docker/start/:container', async (req, res) => {
 });
 
 // ── GET /bruce/docker/health — global health summary ──
+/**
+ * Handles GET /bruce/docker/health.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/docker/health', async (req, res) => {
   const auth = validateBruceAuth(req, 'docker');
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });

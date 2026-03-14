@@ -8,6 +8,13 @@ const { spawn } = require('child_process');
 const { validateBruceAuth } = require('../shared/auth');
 const { BRUCE_AUTH_TOKEN, INBOX_RUNNER_URL } = require('../shared/config');
 
+/**
+ * Handles GET /bruce/inbox/check.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/inbox/check', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -31,6 +38,13 @@ router.get('/bruce/inbox/check', async (req, res) => {
   }
 });
 
+/**
+ * Handles POST /bruce/inbox/ingest.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/inbox/ingest', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -50,6 +64,13 @@ router.post('/bruce/inbox/ingest', async (req, res) => {
   }
 });
 
+/**
+ * Handles GET /bruce/archive/check.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/archive/check', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -69,6 +90,13 @@ router.get('/bruce/archive/check', async (req, res) => {
   }
 });
 
+/**
+ * Handles POST /bruce/archive/ingest.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/archive/ingest', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });

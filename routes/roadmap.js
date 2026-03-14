@@ -9,6 +9,13 @@ const { fetchWithTimeout } = require('../shared/fetch-utils');
 // Marks a roadmap task as done with required evidence.
 // Body: { id: number, evidence: string }
 // Respects trigger [847] which requires non-empty evidence for done transition.
+/**
+ * Handles POST /bruce/roadmap/done.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/roadmap/done', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });

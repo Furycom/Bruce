@@ -4,6 +4,13 @@ const { SUPABASE_URL, SUPABASE_KEY } = require('../shared/config');
 
 const router = Router();
 
+/**
+ * Handles GET /tools.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/tools', (req, res) => {
   res.json({
     tools: [
@@ -48,6 +55,13 @@ router.get('/tools', (req, res) => {
   });
 });
 
+/**
+ * Handles POST /tools/echo.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/tools/echo', (req, res) => {
   res.json({
     ok: true,
@@ -56,6 +70,13 @@ router.post('/tools/echo', (req, res) => {
   });
 });
 
+/**
+ * Handles POST /tools/supabase/exec-sql.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/tools/supabase/exec-sql', async (req, res) => {
   try {
     const sql = String((req.body && (req.body.sql || req.body.query)) ? (req.body.sql || req.body.query) : '').trim().replace(/;+\s*$/, '');

@@ -5,6 +5,13 @@ const { BROWSERLESS_URL } = require('../shared/config');
 
 const router = Router();
 
+/**
+ * Handles POST /bruce/browser/fetch.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/browser/fetch', async (req, res) => {
   const { url, wait_for, timeout = 15000 } = req.body || {};
   if (!url) return res.status(400).json({ ok: false, error: 'url required' });
@@ -21,6 +28,13 @@ router.post('/bruce/browser/fetch', async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
+/**
+ * Handles POST /bruce/browser/screenshot.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/browser/screenshot', async (req, res) => {
   const { url, full_page = false, timeout = 15000 } = req.body || {};
   if (!url) return res.status(400).json({ ok: false, error: 'url required' });
@@ -38,6 +52,13 @@ router.post('/bruce/browser/screenshot', async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
+/**
+ * Handles POST /bruce/browser/scrape.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/browser/scrape', async (req, res) => {
   const { url, selector, timeout = 15000 } = req.body || {};
   if (!url) return res.status(400).json({ ok: false, error: 'url required' });

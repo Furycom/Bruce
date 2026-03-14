@@ -6,6 +6,13 @@ const { validateBruceAuth } = require('../shared/auth');
 const router = Router();
 
 // POST /bruce/staging/validate — via validate_service HTTP sur hote port 4001
+/**
+ * Handles POST /bruce/staging/validate.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/staging/validate', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
@@ -26,6 +33,13 @@ router.post('/bruce/staging/validate', async (req, res) => {
 });
 
 // GET /bruce/staging/status — etat staging_queue
+/**
+ * Handles GET /bruce/staging/status.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/staging/status', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });

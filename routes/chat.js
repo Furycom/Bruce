@@ -26,10 +26,22 @@ const { bruceRagContext } = require('./rag');
 
 // --- LLM PROXY HELPERS ---
 
+  /**
+   * bruceLlmBase internal helper.
+   * @param {any} args - Function input parameters.
+   * @returns {any} Helper return value used by route handlers.
+   */
   function bruceLlmBase() {
     return String(BRUCE_LLM_API_BASE || "").replace(/\/+$/, "");
   }
 
+  /**
+   * bruceFetchWithTimeout internal helper.
+   * @param {any} url - Function input parameters.
+   * @param {any} opts - Additional function input parameter.
+   * @param {any} timeoutMs - Additional function input parameter.
+   * @returns {any} Helper return value used by route handlers.
+   */
   async function bruceFetchWithTimeout(url, opts, timeoutMs) {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), timeoutMs);
@@ -44,6 +56,13 @@ const { bruceRagContext } = require('./rag');
 // --- ROUTE HANDLERS ---
 
 // GET /bruce/config/llm
+/**
+ * Handles GET /bruce/config/llm.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get("/bruce/config/llm", (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -56,6 +75,13 @@ router.get("/bruce/config/llm", (req, res) => {
 });
 
 // /bruce/llm/models
+  /**
+   * Handles GET /bruce/llm/models.
+   * Expected params: request path/query/body fields consumed by this handler.
+   * @param {import('express').Request} req - Express request containing endpoint parameters.
+   * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+   * @returns {Promise<void>|void} Sends the HTTP JSON response.
+   */
   router.get("/bruce/llm/models", async (req, res) => {
     const auth = validateBruceAuth(req);
     if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -85,6 +111,13 @@ router.get("/bruce/config/llm", (req, res) => {
   });
 
 // /bruce/llm/chat
+  /**
+   * Handles POST /bruce/llm/chat.
+   * Expected params: request path/query/body fields consumed by this handler.
+   * @param {import('express').Request} req - Express request containing endpoint parameters.
+   * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+   * @returns {Promise<void>|void} Sends the HTTP JSON response.
+   */
   router.post("/bruce/llm/chat", async (req, res) => {
     const auth = validateBruceAuth(req);
     if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -133,16 +166,32 @@ router.get("/bruce/config/llm", (req, res) => {
   // Also exposed as /v1/* for convenience.
   // =========================================================
 
+  /**
+   * openaiUnixNow internal helper.
+   * @param {any} args - Function input parameters.
+   * @returns {any} Helper return value used by route handlers.
+   */
   function openaiUnixNow() {
     return Math.floor(Date.now() / 1000);
   }
 
+  /**
+   * openaiMakeId internal helper.
+   * @param {any} prefix - Function input parameter.
+   * @returns {any} Helper return value used by route handlers.
+   */
   function openaiMakeId(prefix) {
     return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Math.random()
       .toString(36)
       .slice(2, 10)}`;
   }
 
+  /**
+   * openaiSendAuthError internal helper.
+   * @param {any} res - Function input parameters.
+   * @param {any} auth - Additional function input parameter.
+   * @returns {any} Helper return value used by route handlers.
+   */
   function openaiSendAuthError(res, auth) {
     return res.status(auth.status || 401).json({
       error: {
@@ -152,6 +201,12 @@ router.get("/bruce/config/llm", (req, res) => {
     });
   }
 
+  /**
+   * openaiModelsHandler internal helper.
+   * @param {any} req - Function input parameters.
+   * @param {any} res - Additional function input parameter.
+   * @returns {any} Helper return value used by route handlers.
+   */
   async function openaiModelsHandler(req, res) {
     const auth = validateBruceAuth(req);
     if (!auth.ok) return openaiSendAuthError(res, auth);
@@ -170,6 +225,12 @@ router.get("/bruce/config/llm", (req, res) => {
     });
   }
 
+  /**
+   * openaiChatCompletionsHandler internal helper.
+   * @param {any} req - Function input parameters.
+   * @param {any} res - Additional function input parameter.
+   * @returns {any} Helper return value used by route handlers.
+   */
   async function openaiChatCompletionsHandler(req, res) {
     const auth = validateBruceAuth(req);
     if (!auth.ok) return openaiSendAuthError(res, auth);
@@ -262,13 +323,48 @@ router.get("/bruce/config/llm", (req, res) => {
     }
   }
 
+  /**
+   * Handles GET /api/openai/v1/models.
+   * Expected params: request path/query/body fields consumed by this handler.
+   * @param {import('express').Request} req - Express request containing endpoint parameters.
+   * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+   * @returns {Promise<void>|void} Sends the HTTP JSON response.
+   */
   router.get('/api/openai/v1/models', openaiModelsHandler);
+  /**
+   * Handles GET /v1/models.
+   * Expected params: request path/query/body fields consumed by this handler.
+   * @param {import('express').Request} req - Express request containing endpoint parameters.
+   * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+   * @returns {Promise<void>|void} Sends the HTTP JSON response.
+   */
   router.get('/v1/models', openaiModelsHandler);
 
+  /**
+   * Handles POST /api/openai/v1/chat/completions.
+   * Expected params: request path/query/body fields consumed by this handler.
+   * @param {import('express').Request} req - Express request containing endpoint parameters.
+   * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+   * @returns {Promise<void>|void} Sends the HTTP JSON response.
+   */
   router.post('/api/openai/v1/chat/completions', openaiChatCompletionsHandler);
+  /**
+   * Handles POST /v1/chat/completions.
+   * Expected params: request path/query/body fields consumed by this handler.
+   * @param {import('express').Request} req - Express request containing endpoint parameters.
+   * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+   * @returns {Promise<void>|void} Sends the HTTP JSON response.
+   */
   router.post('/v1/chat/completions', openaiChatCompletionsHandler);
 
 // --- /bruce/llm/generate ---
+/**
+ * Handles POST /bruce/llm/generate.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/llm/generate', async (req, res) => {
   // RAG strict gate (rag===true only)
   // If caller didn't explicitly set rag:true, we skip retrieval + injection completely.
@@ -374,6 +470,13 @@ router.post('/bruce/llm/generate', async (req, res) => {
 });
 
 // --- /chat ---
+/**
+ * Handles POST /chat.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/chat', async (req, res) => {
   // Auth
   const authCheck = validateBruceAuth(req);
@@ -531,6 +634,13 @@ try {
   }
 }
 
+/**
+ * sshExecViaNodeSsh internal helper.
+ * @param {any} host - Function input parameters.
+ * @param {any} command - Additional function input parameter.
+ * @param {any} timeoutMs - Additional function input parameter.
+ * @returns {any} Helper return value used by route handlers.
+ */
 async function sshExecViaNodeSsh(host, command, timeoutMs) {
   if (!NodeSSH) {
     throw new Error("node-ssh introuvable (vérifie l'installation npm dans /home/furycom/mcp-stack/mcp-gateway).");
@@ -691,6 +801,12 @@ const AVAILABLE_TOOLS = [
 ];
 
 // Fonction pour exécuter un tool
+/**
+ * executeTool internal helper.
+ * @param {any} toolName - Function input parameters.
+ * @param {any} params - Additional function input parameter.
+ * @returns {any} Helper return value used by route handlers.
+ */
 async function executeTool(toolName, params) {
   const safeParams = params && typeof params === "object" ? params : {};
   const host = safeParams.host ? String(safeParams.host) : "";
@@ -861,16 +977,33 @@ async function executeTool(toolName, params) {
   }
 }
 
+/**
+ * bruceAgentLlmBase internal helper.
+ * @param {any} args - Function input parameters.
+ * @returns {any} Helper return value used by route handlers.
+ */
 function bruceAgentLlmBase() {
   // BRUCE_LLM_API_BASE est déjà utilisé ailleurs dans server.js (ex: /bruce/config/llm)
   return String(BRUCE_LLM_API_BASE || "").replace(/\/+$/, "");
 }
 
+/**
+ * bruceAgentTimeoutMs internal helper.
+ * @param {any} args - Function input parameters.
+ * @returns {any} Helper return value used by route handlers.
+ */
 function bruceAgentTimeoutMs() {
   const n = parseInt(String(BRUCE_LLM_TIMEOUT_MS || ""), 10);
   return Number.isFinite(n) && n > 0 ? n : 180000;
 }
 
+/**
+ * bruceAgentFetchWithTimeout internal helper.
+ * @param {any} url - Function input parameters.
+ * @param {any} opts - Additional function input parameter.
+ * @param {any} timeoutMs - Additional function input parameter.
+ * @returns {any} Helper return value used by route handlers.
+ */
 async function bruceAgentFetchWithTimeout(url, opts, timeoutMs) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
@@ -882,6 +1015,13 @@ async function bruceAgentFetchWithTimeout(url, opts, timeoutMs) {
 }
 
 // Endpoint principal BRUCE Agent
+/**
+ * Handles POST /bruce/agent/chat.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post("/bruce/agent/chat", async (req, res) => {
   // FAST-PATH: count machines via query_homelab_db (2.1.10)
   try {
