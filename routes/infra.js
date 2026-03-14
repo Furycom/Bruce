@@ -357,6 +357,10 @@ router.post('/bruce/bootstrap', async (req, res) => {
   const topic = (req.body && req.body.topic) ? String(req.body.topic).slice(0, 200) : '';
   const model = (req.body && req.body.model) ? String(req.body.model).slice(0, 20) : '';
   const profile = (req.body && req.body.profile) ? String(req.body.profile).slice(0, 10) : 'standard'; // [772] C6
+  // [917] Pass-through output filtering flags to session/init
+  const includeTasks = req.body && req.body.include_tasks === false ? false : true;
+  const includeLessons = req.body && req.body.include_lessons === false ? false : true;
+  const includeState = req.body && req.body.include_state === false ? false : true;
   const startMs = Date.now();
 
   const hGw = { 'Authorization': 'Bearer ' + (BRUCE_AUTH_TOKEN || 'bruce-secret-token-01'), 'Content-Type': 'application/json' };
@@ -368,7 +372,7 @@ router.post('/bruce/bootstrap', async (req, res) => {
       fetchWithTimeout('http://127.0.0.1:' + PORT + '/bruce/session/init', {
         method: 'POST',
         headers: hGw,
-        body: JSON.stringify({ topic, scope: 'homelab,general', profile })
+        body: JSON.stringify({ topic, scope: 'homelab,general', profile, include_tasks: includeTasks, include_lessons: includeLessons, include_state: includeState })
       }, 18000)
     ]);
 

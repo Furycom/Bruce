@@ -43,9 +43,10 @@ services:
       - /home/furycom/mcp-stack/shared:/app/shared:ro
       - /home/furycom/mcp-stack/routes:/app/routes:ro
       - /home/furycom/manual-docs:/manual-docs:ro
-      - /home/furycom/bruce-config:/home/furycom/bruce-config:ro
+      - /home/furycom/bruce-config:/home/furycom/bruce-config
       - /home/furycom/inbox:/home/furycom/inbox
       - /home/furycom/archive_inbox:/home/furycom/archive_inbox
+      - /home/furycom/uploads:/home/furycom/uploads
       - /home/furycom/venv-ingestion:/home/furycom/venv-ingestion:ro
       - /home/furycom/push_to_staging.py:/home/furycom/push_to_staging.py:ro
       - /home/furycom/bruce_ingest.py:/home/furycom/bruce_ingest.py:ro

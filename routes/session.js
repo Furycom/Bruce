@@ -25,6 +25,10 @@ router.post('/bruce/session/init', async (req, res) => {
   const intention = (req.body && req.body.intention) ? String(req.body.intention).slice(0, 400) : '';
   // [602] project_scope filtering — default: homelab + general
   const projectScope = (req.body && req.body.scope) ? String(req.body.scope).split(',').map(s => s.trim().toLowerCase()) : ['homelab', 'general'];
+  // [917] Optional output filtering — skip heavy sections to save tokens
+  const includeTasks = req.body && req.body.include_tasks === false ? false : true;
+  const includeLessons = req.body && req.body.include_lessons === false ? false : true;
+  const includeState = req.body && req.body.include_state === false ? false : true;
 
   const base = String(SUPABASE_URL || '').replace(/\/+$/, '');
   const key  = String(SUPABASE_KEY || '');
@@ -411,11 +415,11 @@ Sois direct, precis, actionnable.`;
       llm_ok: llmOk,
       dashboard,
       // [829] Compact next_tasks: strip descriptions to save ~4000 tokens
-      next_tasks: roadmap.slice(0, 100).map(t => ({ id: t.id, status: t.status, priority: t.priority, step_name: t.step_name, model_hint: t.model_hint })),
-      critical_lessons: effectiveLessons,
+      next_tasks: includeTasks ? roadmap.slice(0, 100).map(t => ({ id: t.id, status: t.status, priority: t.priority, step_name: t.step_name, model_hint: t.model_hint })) : [],
+      critical_lessons: includeLessons ? effectiveLessons : [],
       last_session: lastSession,
       rag_context: ragResults,
-      current_state: currentState,
+      current_state: includeState ? currentState : [],
       // [828] homelab_services removed — see claude.md + SERVICES_CONFIG
       clarifications_pending: clarificationsPending,
       // [779] Rappel obligatoire pour sessions Code
