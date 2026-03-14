@@ -8,7 +8,7 @@ const router = Router();
 // POST /bruce/staging/validate — via validate_service HTTP sur hote port 4001
 router.post('/bruce/staging/validate', async (req, res) => {
   const auth = validateBruceAuth(req);
-  if (!auth.ok) return res.status(401).json({ error: auth.error });
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
   try {
     const r = await fetch(VALIDATE_SERVICE_URL + '/run/validate', {
       method: 'POST',
@@ -23,7 +23,7 @@ router.post('/bruce/staging/validate', async (req, res) => {
 // GET /bruce/staging/status — etat staging_queue
 router.get('/bruce/staging/status', async (req, res) => {
   const auth = validateBruceAuth(req);
-  if (!auth.ok) return res.status(401).json({ error: auth.error });
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
   const base = SUPABASE_URL.replace(/\/+$/, '');
   const hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, Accept: 'application/json' };
   try {

@@ -144,7 +144,9 @@ router.get("/bruce/config/llm", (req, res) => {
   }
 
   function openaiSendAuthError(res, auth) {
+    // TODO: migrate to standard contract without breaking OpenAI-compatible clients.
     return res.status(auth.status || 401).json({
+      ok: false,
       error: {
         message: auth.error || 'Unauthorized',
         type: 'invalid_request_error',
@@ -158,6 +160,7 @@ router.get("/bruce/config/llm", (req, res) => {
 
     if (!BRUCE_LLM_MODEL) {
       return res.status(500).json({
+        ok: false,
         error: { message: 'BRUCE_LLM_MODEL is not configured', type: 'server_error' },
       });
     }
@@ -180,6 +183,7 @@ router.get("/bruce/config/llm", (req, res) => {
 
     if (!messages.length) {
       return res.status(400).json({
+        ok: false,
         error: { message: 'Missing or empty messages[]', type: 'invalid_request_error' },
       });
     }
@@ -193,6 +197,7 @@ router.get("/bruce/config/llm", (req, res) => {
 
     if (!normalized.length) {
       return res.status(400).json({
+        ok: false,
         error: { message: 'Invalid messages[] entries (need role + content)', type: 'invalid_request_error' },
       });
     }
@@ -257,6 +262,7 @@ router.get("/bruce/config/llm", (req, res) => {
     } catch (err) {
       const emsg = err && err.message ? String(err.message) : 'LLM call failed';
       return res.status(502).json({
+        ok: false,
         error: { message: emsg.slice(0, 800), type: 'server_error' },
       });
     }
@@ -379,6 +385,7 @@ router.post('/chat', async (req, res) => {
   const authCheck = validateBruceAuth(req);
   if (!authCheck.ok) {
     return res.status(authCheck.status || 401).json({
+      ok: false,
       error: authCheck.error || 'Unauthorized',
     });
   }
@@ -388,6 +395,7 @@ router.post('/chat', async (req, res) => {
 
   if (!messages || !messages.length) {
     return res.status(400).json({
+      ok: false,
       error: 'Missing or empty "messages" array',
     });
   }
@@ -396,16 +404,19 @@ router.post('/chat', async (req, res) => {
   for (const msg of messages) {
     if (!msg || typeof msg !== 'object') {
       return res.status(400).json({
+        ok: false,
         error: 'Each message must be an object with "role" and "content"',
       });
     }
     if (!msg.role || typeof msg.role !== 'string') {
       return res.status(400).json({
+        ok: false,
         error: 'Each message must have a "role" string',
       });
     }
     if (!msg.content || typeof msg.content !== 'string') {
       return res.status(400).json({
+        ok: false,
         error: 'Each message must have a "content" string',
       });
     }
@@ -414,12 +425,14 @@ router.post('/chat', async (req, res) => {
   const lastMessage = messages[messages.length - 1];
   if (lastMessage.role !== 'user' && lastMessage.role !== 'system') {
     return res.status(400).json({
+      ok: false,
       error: "The last message must have role 'user' or 'system'",
     });
   }
 
   if (lastMessage.content.length > BRUCE_MAX_MESSAGE_CHARS) {
     return res.status(400).json({
+      ok: false,
       error: `Last message exceeds ${BRUCE_MAX_MESSAGE_CHARS} characters`,
     });
   }
@@ -492,6 +505,7 @@ router.post('/chat', async (req, res) => {
     });
 
     return res.status(502).json({
+      ok: false,
       error: 'LLM backend unavailable or error',
       details: err.message || String(err),
     });
@@ -883,6 +897,7 @@ async function bruceAgentFetchWithTimeout(url, opts, timeoutMs) {
 
 // Endpoint principal BRUCE Agent
 router.post("/bruce/agent/chat", async (req, res) => {
+  // TODO: migrate to standard contract without breaking existing agent clients using success/response fields.
   // FAST-PATH: count machines via query_homelab_db (2.1.10)
   try {
   let body = req.body;
@@ -918,7 +933,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
   // Auth identique aux autres endpoints /bruce/*
   const auth = validateBruceAuth(req);
   if (!auth.ok) {
-    return res.status(auth.status || 401).json({ success: false, error: auth.error || "Unauthorized" });
+    return res.status(auth.status || 401).json({ ok: false, success: false, error: auth.error || "Unauthorized" });
   }
 
   try {
@@ -927,11 +942,12 @@ router.post("/bruce/agent/chat", async (req, res) => {
     const conversation_history = Array.isArray(body.conversation_history) ? body.conversation_history : [];
 
     if (!message) {
-      return res.status(400).json({ success: false, error: "Message is required" });
+      return res.status(400).json({ ok: false, success: false, error: "Message is required" });
     }
 
     if (!SYSTEM_PROMPT) {
       return res.status(500).json({
+        ok: false,
         success: false,
         error: `Impossible de lire ${SYSTEM_PROMPT_PATH}`
       });
@@ -939,10 +955,10 @@ router.post("/bruce/agent/chat", async (req, res) => {
 
     const base = bruceAgentLlmBase();
     if (!base) {
-      return res.status(503).json({ success: false, error: "LLM base is not configured (BRUCE_LLM_API_BASE)" });
+      return res.status(503).json({ ok: false, success: false, error: "LLM base is not configured (BRUCE_LLM_API_BASE)" });
     }
     if (!BRUCE_LLM_MODEL) {
-      return res.status(503).json({ success: false, error: "LLM model is not configured (BRUCE_LLM_MODEL)" });
+      return res.status(503).json({ ok: false, success: false, error: "LLM model is not configured (BRUCE_LLM_MODEL)" });
     }
 
     // Construire messages pour vLLM
@@ -973,13 +989,13 @@ router.post("/bruce/agent/chat", async (req, res) => {
 
     const t1 = await r1.text();
     if (!r1.ok) {
-      return res.status(502).json({ success: false, error: `LLM error: ${r1.status} ${r1.statusText}`, details: clampStr(t1, 4000) });
+      return res.status(502).json({ ok: false, success: false, error: `LLM error: ${r1.status} ${r1.statusText}`, details: clampStr(t1, 4000) });
     }
 
     const vllmData = safeJsonParse(t1, null);
     const assistantMessage = vllmData && vllmData.choices && vllmData.choices[0] && vllmData.choices[0].message;
     if (!assistantMessage) {
-      return res.status(502).json({ success: false, error: "LLM response missing choices[0].message" });
+      return res.status(502).json({ ok: false, success: false, error: "LLM response missing choices[0].message" });
     }
 
     // Fallback legacy tool_call (models may return <tool_call> in content)
@@ -1042,7 +1058,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
 
       const t2 = await r2.text();
       if (!r2.ok) {
-        return res.status(502).json({ success: false, error: `LLM follow-up error: ${r2.status} ${r2.statusText}`, details: clampStr(t2, 4000) });
+        return res.status(502).json({ ok: false, success: false, error: `LLM follow-up error: ${r2.status} ${r2.statusText}`, details: clampStr(t2, 4000) });
       }
 
       const followUpData = safeJsonParse(t2, null);
@@ -1074,6 +1090,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
 
   } catch (error) {
     return res.status(500).json({
+      ok: false,
       success: false,
       error: String(error && error.message ? error.message : error)
     });

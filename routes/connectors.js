@@ -13,6 +13,7 @@ router.get('/connectors', async (req, res) => {
     connectors = JSON.parse(raw);
   } catch (err) {
     return res.status(500).json({
+      ok: false,
       error: 'Failed to read connectors.json',
       details: err.message || String(err),
     });

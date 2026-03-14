@@ -17,6 +17,7 @@ router.get('/manual/pages', (req, res) => {
     });
   } catch (err) {
     res.status(500).json({
+      ok: false,
       error: 'Failed to list manual pages',
       details: err.message || String(err),
     });
@@ -27,6 +28,7 @@ router.get('/manual/page', (req, res) => {
   const relPath = (req.query.path || '').toString().trim();
   if (!relPath) {
     return res.status(400).json({
+      ok: false,
       error: 'Missing "path" query parameter',
     });
   }
@@ -36,6 +38,7 @@ router.get('/manual/page', (req, res) => {
     fullPath = safeJoinManual(relPath);
   } catch (err) {
     return res.status(400).json({
+      ok: false,
       error: err.message || String(err),
     });
   }
@@ -51,11 +54,13 @@ router.get('/manual/page', (req, res) => {
   } catch (err) {
     if (err.code === 'ENOENT') {
       return res.status(404).json({
+        ok: false,
         error: 'Manual page not found',
         path: relPath,
       });
     }
     res.status(500).json({
+      ok: false,
       error: 'Failed to read manual page',
       details: err.message || String(err),
     });
@@ -66,6 +71,7 @@ router.get('/manual/search', (req, res) => {
   const rawQuery = (req.query.query || req.query.q || '').toString().trim();
   if (!rawQuery) {
     return res.status(400).json({
+      ok: false,
       error: 'Missing "query" (or "q") query parameter',
     });
   }
@@ -79,7 +85,8 @@ router.get('/manual/search', (req, res) => {
     try {
       const fullPath = safeJoinManual(relPath);
       content = fs.readFileSync(fullPath, 'utf8');
-    } catch {
+    } catch (err) {
+      console.error('[manual.js][/manual/search] failed reading file:', err && err.message ? err.message : err);
       continue;
     }
 
