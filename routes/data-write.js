@@ -91,7 +91,7 @@ router.post('/bruce/write', async (req, res) => {
         const stgEntry = Array.isArray(stgData) ? stgData[0] : stgData;
         if (stgEntry?.rejection_reason) rejectionReason = stgEntry.rejection_reason;
         if (stgEntry?.status === 'rejected' && !rejectionReason) rejectionReason = 'Rejected by validate.py (no reason captured)';
-      } catch(re) { /* ignore fetch error */ }
+      } catch(re) { console.error('[data-write.js][/bruce/data/write] erreur silencieuse:', re.message || re); }
     }
 
     const response = {

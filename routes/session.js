@@ -87,7 +87,7 @@ router.post('/bruce/session/init', async (req, res) => {
         newSessionId = createData.id;
       }
     } catch (sessErr) {
-      // Non-blocking: session creation failure doesn't break init
+      console.error('[session.js][/bruce/session/init] erreur silencieuse:', sessErr.message || sessErr);
     }
 
     // -- 2. RAG semantique multi-query [90+91] --
@@ -150,7 +150,7 @@ router.post('/bruce/session/init', async (req, res) => {
           preview: (r.preview || '').slice(0, 200)
         }));
     } catch (ragErr) {
-      // RAG optionnel - ne bloque pas
+      console.error('[session.js][/bruce/session/init] erreur silencieuse:', ragErr.message || ragErr);
     }
 
     // [719] CONTEXT ROUTER v2: FTS + semantique hybride en parallele
@@ -201,7 +201,7 @@ router.post('/bruce/session/init', async (req, res) => {
               validSemIds.forEach(s => { scoreMap[s.id] = s.score; });
               semLessons = semRaw.map(l => ({ ...l, _sem_score: scoreMap[l.id] || 0.5 }));
             }
-          } catch (_) {}
+          } catch (e) { console.error('[session.js][/bruce/session/init] erreur silencieuse:', e.message || e); }
         }
 
         // Fusionner FTS + semantique avec score composite
@@ -265,7 +265,7 @@ router.post('/bruce/session/init', async (req, res) => {
         userProfileContext = '\n\n**PROFIL UTILISATEUR YANN (injection [877]):**\n'
           + profiles.map(p => p.answer.slice(0, 600)).join('\n');
       }
-    } catch (e) { /* non-bloquant */ }
+    } catch (e) { console.error('[session.js][/bruce/session/init] erreur silencieuse:', e.message || e); }
 
     let llmSummary = null;
     let llmOk = false;
@@ -482,7 +482,7 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
       const data = await r.json();
       sessionInfo = Array.isArray(data) && data[0] ? data[0] : null;
     } catch (e) {
-      // pas bloquant
+      console.error('[session.js][/bruce/session/close/checklist] erreur silencieuse:', e.message || e);
     }
 
     // ── 2. Récupérer les lessons créées pendant cette session ──
@@ -493,7 +493,7 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
         { headers: hSupa }, 8000
       );
       sessionLessons = await r.json();
-    } catch (e) {}
+    } catch (e) { console.error('[session.js][/bruce/session/close/checklist] erreur silencieuse:', e.message || e); }
 
     // ── 3. Récupérer les tâches roadmap modifiées (doing/done récentes) ──
     let recentTasks = [];
@@ -503,7 +503,7 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
         { headers: hSupa }, 8000
       );
       recentTasks = await r.json();
-    } catch (e) {}
+    } catch (e) { console.error('[session.js][/bruce/session/close/checklist] erreur silencieuse:', e.message || e); }
 
     // ── 4. Récupérer le staging pending (devrait être 0 avant clôture) ──
     let stagingPending = 0;
@@ -514,7 +514,7 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
       );
       const data = await r.json();
       stagingPending = Array.isArray(data) ? data.length : 0;
-    } catch (e) {}
+    } catch (e) { console.error('[session.js][/bruce/session/close/checklist] erreur silencieuse:', e.message || e); }
 
     // ── 5. Récupérer CURRENT_STATE handoff_vivant ──
     let currentHandoff = '';
@@ -525,7 +525,7 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
       );
       const data = await r.json();
       currentHandoff = Array.isArray(data) && data[0] ? data[0].value : '';
-    } catch (e) {}
+    } catch (e) { console.error('[session.js][/bruce/session/close/checklist] erreur silencieuse:', e.message || e); }
 
     // ── 6. Construire la checklist avec avertissements ──
     const warnings = [];
@@ -560,7 +560,7 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
         const uncommitted = gitOut.trim().split('\n').length;
         warnings.push('[876] WARNING: ' + uncommitted + ' fichier(s) non commite(s) dans mcp-stack. Git commit recommande avant fermeture.');
       }
-    } catch (e) { /* git check optionnel */ }
+    } catch (e) { console.error('[session.js][/bruce/session/close/checklist] erreur silencieuse:', e.message || e); }
 
     if (stagingPending > 0) {
       warnings.push(`⚠️ ${stagingPending} items en staging pending — valider AVANT de clôturer.`);

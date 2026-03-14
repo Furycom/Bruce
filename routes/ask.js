@@ -36,7 +36,7 @@ router.post('/bruce/ask', async (req, res) => {
         const histData = await histRes.json();
         conversationHistory = histData.reverse().map(m => ({ role: m.role, content: m.content }));
       }
-    } catch(e) { /* historique non critique */ }
+    } catch(e) { console.error('[ask.js][/bruce/ask] erreur silencieuse:', e.message || e); }
   }
 
   // 1. RAG: chercher contexte pertinent
@@ -127,7 +127,7 @@ Reponds de facon concise et actionnable.`;
             body: JSON.stringify(msgs) },
           5000
         );
-      } catch(e) { /* non critique */ }
+      } catch(e) { console.error('[ask.js][/bruce/ask] erreur silencieuse:', e.message || e); }
     }
 
     return res.json({

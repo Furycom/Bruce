@@ -37,7 +37,7 @@ router.all('/bruce/tools/unlocked', async (req, res) => {
         try {
           const r = await fetchWithTimeout(c.url, { method: 'GET' }, 3000);
           if (r.ok) caps.push(...c.caps);
-        } catch (_) {}
+        } catch (e) { console.error('[tools-unlock.js][/bruce/tools/unlocked] erreur silencieuse:', e.message || e); }
       }));
       if (caps.includes('embedder_bge_m3') && caps.includes('supabase_operationnel')) {
         caps.push('indexation_auto_chunks');
