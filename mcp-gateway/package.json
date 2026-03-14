@@ -4,7 +4,10 @@
   "description": "MCP Gateway for Yann's homelab",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "jest --verbose",
+    "test:unit": "jest tests/unit --verbose",
+    "test:integration": "jest tests/integration --verbose"
   },
   "dependencies": {
     "better-sqlite3": "^12.6.2",
@@ -12,5 +15,9 @@
     "express": "^4.19.2",
     "node-ssh": "^13.2.1",
     "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
   }
 }
