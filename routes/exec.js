@@ -13,7 +13,7 @@ const router = Router();
 // ── POST /bruce/exec — execute whitelisted commands ──
 router.post('/bruce/exec', async (req, res) => {
   const auth = validateBruceAuth(req, 'exec');
-  if (!auth.ok) return res.status(401).json({ error: auth.error });
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
 
   const { command, timeout = 15000 } = req.body || {};
   if (!command) return res.status(400).json({ ok: false, error: 'command required' });
@@ -37,6 +37,7 @@ router.post('/bruce/exec', async (req, res) => {
     });
     const ms = Date.now() - t0;
     auditLog('/bruce/exec', req.headers['x-session-id'], 'local', cmd, 'ok', ms);
+    // TODO(contract-v2): migrate success payload to { ok: true, data } without breaking current consumers.
     res.json({
       ok: true,
       command: cmd,
@@ -46,7 +47,8 @@ router.post('/bruce/exec', async (req, res) => {
   } catch (e) {
     const ms = Date.now() - t0;
     auditLog('/bruce/exec', req.headers['x-session-id'], 'local', cmd, 'error', ms);
-    res.status(200).json({
+    // TODO(contract-v2): migrate error payload to { ok: false, error, data } without breaking current consumers.
+    res.status(500).json({
       ok: false,
       command: cmd,
       error: e.message,

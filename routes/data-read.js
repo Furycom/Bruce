@@ -39,9 +39,10 @@ router.post("/bruce/read", async (req, res) => {
     }
 
     const text = lastText || "";
-    if (!r.ok) return res.status(r.status).send(text);
+    if (!r.ok) return res.status(r.status).json({ ok: false, error: text || ('Supabase error ' + r.status) });
 
     res.setHeader("Content-Type", "application/json; charset=utf-8");
+    // TODO(contract-v2): wrap read result into { ok: true, data } after consumer migration.
     return res.send(text);
   } catch (e) {
     return res.status(500).json({ ok: false, error: String(e && e.message ? e.message : e) });
@@ -55,6 +56,7 @@ router.get('/bruce/roadmap/list', async (req, res) => {
     const resp = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } });
     if (!resp.ok) throw new Error(`Supabase ${resp.status}`);
     const tasks = await resp.json();
+    // TODO(contract-v2): migrate success payload to { ok: true, data } without breaking current consumers.
     return res.json({
       ok: true,
       count: tasks.length,
