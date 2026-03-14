@@ -366,31 +366,363 @@ const BRUCE_OPENAPI_SPEC = {
 };
 
 
-// --- PATCH: OpenAPI expose /bruce/agent/chat ---
-BRUCE_OPENAPI_SPEC.paths["/bruce/agent/chat"] = {
-  post: {
-    summary: "BRUCE Agent chat",
-    requestBody: {
-      required: true,
-      content: {
-        "application/json": {
-          schema: { type: "object", additionalProperties: true }
-        }
+const standardResponses = {
+  "200": {
+    description: "OK",
+    content: {
+      "application/json": {
+        schema: { type: "object", additionalProperties: true }
       }
-    },
-    responses: {
-      "200": {
-        description: "OK",
-        content: {
-          "application/json": {
-            schema: { type: "object", additionalProperties: true }
-          }
-        }
+    }
+  },
+  "400": {
+    description: "Bad request",
+    content: {
+      "application/json": {
+        schema: { type: "object", additionalProperties: true }
+      }
+    }
+  },
+  "401": {
+    description: "Unauthorized",
+    content: {
+      "application/json": {
+        schema: { type: "object", additionalProperties: true }
+      }
+    }
+  },
+  "500": {
+    description: "Internal server error",
+    content: {
+      "application/json": {
+        schema: { type: "object", additionalProperties: true }
       }
     }
   }
 };
-// --- /PATCH ---
+
+Object.assign(BRUCE_OPENAPI_SPEC.paths, {
+  "/admin": {
+    get: { operationId: "admin_ui", summary: "Serve admin dashboard placeholder page", responses: standardResponses }
+  },
+  "/connectors": {
+    get: { operationId: "connectors_list", summary: "List configured connectors and statuses", responses: standardResponses }
+  },
+  "/manual/pages": {
+    get: { operationId: "manual_pages", summary: "List available manual markdown pages", responses: standardResponses }
+  },
+  "/manual/page": {
+    get: { operationId: "manual_page", summary: "Read one manual markdown page by path", responses: standardResponses }
+  },
+  "/manual/search": {
+    get: { operationId: "manual_search", summary: "Search text across manual pages", responses: standardResponses }
+  },
+  "/tools": {
+    get: { operationId: "tools_list", summary: "List available tools metadata", responses: standardResponses }
+  },
+  "/tools/echo": {
+    post: {
+      operationId: "tools_echo",
+      summary: "Echo provided payload for diagnostics",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/tools/supabase/exec-sql": {
+    post: {
+      operationId: "tools_supabase_exec_sql",
+      summary: "Execute a SQL statement against Supabase",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { type: "object", required: ["sql"], properties: { sql: { type: "string" } } }
+          }
+        }
+      },
+      responses: standardResponses
+    }
+  },
+  "/bruce/browser/fetch": {
+    post: {
+      operationId: "bruce_browser_fetch",
+      summary: "Fetch remote page HTML via browser helper",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["url"], properties: { url: { type: "string" } } } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/browser/screenshot": {
+    post: {
+      operationId: "bruce_browser_screenshot",
+      summary: "Capture a screenshot of a remote page",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["url"], properties: { url: { type: "string" } } } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/browser/scrape": {
+    post: {
+      operationId: "bruce_browser_scrape",
+      summary: "Scrape structured content from a remote page",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["url"], properties: { url: { type: "string" } } } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/chatgpt": {
+    post: {
+      operationId: "bruce_chatgpt",
+      summary: "Proxy a ChatGPT-style completion request",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/read": {
+    post: {
+      operationId: "bruce_read",
+      summary: "Read data from configured backend resources",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/roadmap/list": {
+    get: { operationId: "bruce_roadmap_list", summary: "List roadmap tasks and their statuses", responses: standardResponses }
+  },
+  "/bruce/write": {
+    post: {
+      operationId: "bruce_write",
+      summary: "Write data to configured backend resources",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/docker/ps": {
+    get: { operationId: "bruce_docker_ps", summary: "List running Docker containers", responses: standardResponses }
+  },
+  "/bruce/docker/inspect/{container}": {
+    get: { operationId: "bruce_docker_inspect", summary: "Inspect one Docker container", responses: standardResponses }
+  },
+  "/bruce/docker/logs/{container}": {
+    get: { operationId: "bruce_docker_logs", summary: "Read recent logs from one Docker container", responses: standardResponses }
+  },
+  "/bruce/docker/stats/{container}": {
+    get: { operationId: "bruce_docker_stats", summary: "Read runtime stats from one Docker container", responses: standardResponses }
+  },
+  "/bruce/docker/restart/{container}": {
+    post: { operationId: "bruce_docker_restart", summary: "Restart one Docker container", responses: standardResponses }
+  },
+  "/bruce/docker/stop/{container}": {
+    post: { operationId: "bruce_docker_stop", summary: "Stop one Docker container", responses: standardResponses }
+  },
+  "/bruce/docker/start/{container}": {
+    post: { operationId: "bruce_docker_start", summary: "Start one Docker container", responses: standardResponses }
+  },
+  "/bruce/docker/health": {
+    get: { operationId: "bruce_docker_health", summary: "Get aggregated Docker health status", responses: standardResponses }
+  },
+  "/bruce/exec": {
+    post: {
+      operationId: "bruce_exec",
+      summary: "Execute a command with gateway execution guardrails",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["cmd"], properties: { cmd: { type: "string" } } } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/file/write": {
+    post: {
+      operationId: "bruce_file_write",
+      summary: "Write text content to an allowed file path",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["path", "content"], properties: { path: { type: "string" }, content: { type: "string" } } } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/file/read": {
+    get: { operationId: "bruce_file_read", summary: "Read text content from an allowed file path", responses: standardResponses }
+  },
+  "/bruce/inbox/check": {
+    get: { operationId: "bruce_inbox_check", summary: "Check inbox source for new items", responses: standardResponses }
+  },
+  "/bruce/inbox/ingest": {
+    post: {
+      operationId: "bruce_inbox_ingest",
+      summary: "Ingest new inbox items into the system",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/archive/check": {
+    get: { operationId: "bruce_archive_check", summary: "Check archive source for new items", responses: standardResponses }
+  },
+  "/bruce/archive/ingest": {
+    post: {
+      operationId: "bruce_archive_ingest",
+      summary: "Ingest archived items into the system",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/health": {
+    get: { operationId: "bruce_health_verbose", summary: "Get detailed BRUCE health status", responses: standardResponses }
+  },
+  "/bruce/state": {
+    get: { operationId: "bruce_state", summary: "Get gateway runtime state snapshot", responses: standardResponses }
+  },
+  "/bruce/topology": {
+    get: { operationId: "bruce_topology", summary: "Get current service topology overview", responses: standardResponses }
+  },
+  "/bruce/maintenance/run": {
+    post: {
+      operationId: "bruce_maintenance_run",
+      summary: "Run configured maintenance workflow",
+      requestBody: { required: false, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/sync/homelab-hub": {
+    post: {
+      operationId: "bruce_sync_homelab_hub",
+      summary: "Trigger synchronization with homelab hub",
+      requestBody: { required: false, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/integrity": {
+    get: { operationId: "bruce_integrity", summary: "Run integrity checks across gateway resources", responses: standardResponses }
+  },
+  "/bruce/bootstrap": {
+    post: {
+      operationId: "bruce_bootstrap",
+      summary: "Bootstrap BRUCE runtime prerequisites",
+      requestBody: { required: false, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/llm/status": {
+    get: { operationId: "bruce_llm_status", summary: "Get LLM provider connectivity and status", responses: standardResponses }
+  },
+  "/bruce/tool-check": {
+    post: {
+      operationId: "bruce_tool_check",
+      summary: "Validate tool availability for a given request",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/tools/rag/search": {
+    post: {
+      operationId: "tools_rag_search",
+      summary: "Run RAG search through tools compatibility endpoint",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["q"], properties: { q: { type: "string" } } } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/preflight": {
+    post: {
+      operationId: "bruce_preflight",
+      summary: "Run preflight checks before tool or chat execution",
+      requestBody: { required: false, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/roadmap/done": {
+    post: {
+      operationId: "bruce_roadmap_done",
+      summary: "Mark a roadmap task as completed",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["id"], properties: { id: { type: "string" } } } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/search": {
+    post: {
+      operationId: "bruce_search",
+      summary: "Search data with scoped access control",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["query"], properties: { query: { type: "string" } } } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/session/init": {
+    post: {
+      operationId: "bruce_session_init",
+      summary: "Initialize a new BRUCE session",
+      requestBody: { required: false, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/session/close/checklist": {
+    get: { operationId: "bruce_session_close_checklist", summary: "Get checklist required before closing session", responses: standardResponses }
+  },
+  "/bruce/session/close": {
+    post: {
+      operationId: "bruce_session_close",
+      summary: "Close an active BRUCE session",
+      requestBody: { required: false, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/staging/validate": {
+    post: {
+      operationId: "bruce_staging_validate",
+      summary: "Validate staged changes before apply",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/staging/status": {
+    get: { operationId: "bruce_staging_status", summary: "Get staging workspace status", responses: standardResponses }
+  },
+  "/chat": {
+    post: {
+      operationId: "chat",
+      summary: "Run legacy BRUCE chat endpoint",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/api/openai/v1/models": {
+    get: { operationId: "openai_models_api", summary: "OpenAI-compatible models endpoint alias", responses: standardResponses }
+  },
+  "/v1/models": {
+    get: { operationId: "openai_models", summary: "OpenAI-compatible models endpoint", responses: standardResponses }
+  },
+  "/api/openai/v1/chat/completions": {
+    post: {
+      operationId: "openai_chat_completions_api",
+      summary: "OpenAI-compatible chat completions endpoint alias",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/v1/chat/completions": {
+    post: {
+      operationId: "openai_chat_completions",
+      summary: "OpenAI-compatible chat completions endpoint",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/llm/generate": {
+    post: {
+      operationId: "bruce_llm_generate",
+      summary: "Generate completion from configured LLM",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/agent/chat": {
+    post: {
+      operationId: "bruce_agent_chat",
+      summary: "Run BRUCE agent chat orchestration",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+      responses: standardResponses
+    }
+  },
+  "/bruce/ask": {
+    post: {
+      operationId: "bruce_ask",
+      summary: "Ask BRUCE a direct question and get an answer",
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["question"], properties: { question: { type: "string" } } } } } },
+      responses: standardResponses
+    }
+  }
+});
 
 
 app.get("/openapi.json", (req, res) => {
