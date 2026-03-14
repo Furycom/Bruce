@@ -3,7 +3,8 @@ const { SUPABASE_URL, SUPABASE_KEY } = require('./config');
 const { utcNowIso, logFallback, isSupabaseConfigured } = require('./helpers');
 
 async function insertMemoryEvent(source, eventType, payload) {
-  return null; // [840] disabled: ghost table memory_events (0 rows)
+  // DISABLED: table memory_events inexistante/vidée, voir [840].
+  return null;
   if (!isSupabaseConfigured()) {
     await logFallback({
       kind: 'supabase_memory_events_skipped',
@@ -80,7 +81,8 @@ async function insertMemoryEvent(source, eventType, payload) {
 }
 
 async function insertConversationMessage(eventId, conversationId, role, content) {
-  return; // [840] disabled: ghost table conversation_messages (0 rows)
+  // DISABLED: table conversation_messages inexistante/vidée, voir [840].
+  return;
   if (!isSupabaseConfigured() || !eventId) {
     await logFallback({
       kind: 'supabase_conversation_messages_skipped',
