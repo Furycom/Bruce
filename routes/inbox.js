@@ -106,7 +106,7 @@ router.post('/bruce/archive/ingest', async (req, res) => {
           const ok = code === 0 || stdout.includes('TERMIN') || stdout.includes('staging');
           if (ok) {
             const dest = `${SENT_DIR}/${file}`;
-            try { fs.renameSync(filePath, dest); } catch(e) {}
+            try { fs.renameSync(filePath, dest); } catch(e) { console.error('[inbox.js][/bruce/archive/ingest] erreur silencieuse:', e.message || e); }
           }
           results.push({ file, ok, code, output: stdout.slice(0, 500) });
           resolve();

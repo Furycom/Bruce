@@ -522,7 +522,8 @@ function parseLegacyToolCallFromContent(content) {
     const name = obj && obj.name ? String(obj.name) : null;
     const args = obj && obj.arguments && typeof obj.arguments === "object" ? obj.arguments : {};
     return name ? { name, arguments: args } : null;
-  } catch (_) {
+  } catch (e) {
+    console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', e.message || e);
     return null;
   }
 }
@@ -569,7 +570,7 @@ async function sshExecViaNodeSsh(host, command, timeoutMs) {
     // BRUCE: prefer key auth; fallback to password
     const keyPath = "/home/furycom/bruce-config/bruce_gateway_ed25519";
     let privateKey = null;
-    try { privateKey = fs.readFileSync(keyPath, "utf8"); } catch (_) {}
+    try { privateKey = fs.readFileSync(keyPath, "utf8"); } catch (e) { console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', e.message || e); }
 
     if (privateKey) {
       try {
@@ -609,7 +610,7 @@ const r = await ssh.execCommand(String(command), { execOptions: { pty: false } }
   } finally {
     try {
       ssh.dispose();
-    } catch (_) {}
+    } catch (e) { console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', e.message || e); }
   }
 }
 
@@ -765,7 +766,7 @@ async function executeTool(toolName, params) {
       } catch (err) {
         return { error: String(err && err.message ? err.message : err) };
       } finally {
-        try { db.close(); } catch (_) {}
+        try { db.close(); } catch (e) { console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', e.message || e); }
       }
     }
 
@@ -871,7 +872,7 @@ async function executeTool(toolName, params) {
       } catch (error) {
         try {
           await sshExecViaNodeSsh(host, "rm '" + tempScript + "' 2>/dev/null || true", 5000);
-        } catch (e) {}
+        } catch (e) { console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', e.message || e); }
         
         return {
           success: false,
@@ -925,7 +926,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
         if (rows && rows[0] && Object.prototype.hasOwnProperty.call(rows[0], "count")) {
           n = rows[0].count;
         }
-      } catch (_) {}
+      } catch (e) { console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', e.message || e); }
       const response = (n === null)
         ? (toolRes && toolRes.output ? toolRes.output : JSON.stringify(toolRes))
         : String(n);
@@ -936,7 +937,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
       });
     }
   } catch (err) {
-    // fall through
+    console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', err.message || err);
   }
 
 

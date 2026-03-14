@@ -650,7 +650,7 @@ router.post('/bruce/preflight', async (req, res) => {
         for (const r of (ragResult.results || [])) {
           const chunk = chunkMap[r.chunk_id] || {};
           let anchor = {};
-          try { anchor = typeof chunk.anchor === 'string' ? JSON.parse(chunk.anchor) : (chunk.anchor || {}); } catch(_) {}
+          try { anchor = typeof chunk.anchor === 'string' ? JSON.parse(chunk.anchor) : (chunk.anchor || {}); } catch(e) { console.error('[rag.js][/bruce/preflight] erreur silencieuse:', e.message || e); }
           if (anchor.source !== 'lessons_learned') continue;
           const imp = anchor.importance || '';
           if (imp !== 'critical' && imp !== 'high') continue;
@@ -689,7 +689,7 @@ router.post('/bruce/preflight', async (req, res) => {
         );
         const kbArr = await kbRes.json();
         if (Array.isArray(kbArr)) runbooks.push(...kbArr);
-      } catch(e) { /* optionnel */ }
+      } catch(e) { console.error('[rag.js][/bruce/preflight] erreur silencieuse:', e.message || e); }
     }
     // Dédupliquer runbooks par id
     const seenIds = new Set();

@@ -452,7 +452,9 @@ router.get('/bruce/llm/status', async (req, res) => {
         }
       }
     }
-  } catch (_) {}
+  } catch (e) {
+    console.error('[infra.js][/bruce/llm/status] erreur silencieuse:', e.message || e);
+  }
 
   // 3. Get model name from /props
   try {
@@ -464,7 +466,9 @@ router.get('/bruce/llm/status', async (req, res) => {
       const props = await propsResp.json();
       result.llama_server.model = props.default_generation_settings?.model || null;
     }
-  } catch (_) {}
+  } catch (e) {
+    console.error('[infra.js][/bruce/llm/status] erreur silencieuse:', e.message || e);
+  }
 
   // 4. Check LiteLLM
   try {
@@ -484,7 +488,9 @@ router.get('/bruce/llm/status', async (req, res) => {
       result.dspy_job.running = true;
       result.dspy_job.progress = prog;
     }
-  } catch (_) {}
+  } catch (e) {
+    console.error('[infra.js][/bruce/llm/status] erreur silencieuse:', e.message || e);
+  }
 
   result.elapsed_ms = Date.now() - startMs;
   res.json(result);
