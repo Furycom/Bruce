@@ -13,6 +13,13 @@ const {
 const { fetchWithTimeout } = require('../shared/fetch-utils');
 const { detectLLMIdentity, loadLLMProfile, BRUCE_OPERATING_PRINCIPLES } = require('../shared/llm-profiles');
 
+/**
+ * Handles POST /bruce/ask.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/ask', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });

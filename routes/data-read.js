@@ -5,6 +5,13 @@ const router = express.Router();
 const { validateBruceAuth } = require('../shared/auth');
 const { SUPABASE_URL, SUPABASE_KEY } = require('../shared/config');
 
+/**
+ * Handles POST /bruce/read.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post("/bruce/read", async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
@@ -48,6 +55,13 @@ router.post("/bruce/read", async (req, res) => {
   }
 });
 
+/**
+ * Handles GET /bruce/roadmap/list.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/roadmap/list', async (req, res) => {
   const startMs = Date.now();
   try {

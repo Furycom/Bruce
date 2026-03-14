@@ -14,6 +14,13 @@ const {
 const router = Router();
 
 // Internal fetch with timeout (same pattern as bootstrap)
+/**
+ * fetchLocal internal helper.
+ * @param {any} path - Function input parameters.
+ * @param {any} opts - Additional function input parameter.
+ * @param {any} timeoutMs = 10000 - Additional function input parameter.
+ * @returns {any} Helper return value used by route handlers.
+ */
 async function fetchLocal(path, opts, timeoutMs = 10000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -25,6 +32,13 @@ async function fetchLocal(path, opts, timeoutMs = 10000) {
   }
 }
 
+/**
+ * Handles POST /bruce/chatgpt.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/chatgpt', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });

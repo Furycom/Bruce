@@ -4,6 +4,13 @@ const { validateBruceAuth } = require('../shared/auth');
 const { GATEWAY_PUBLIC_URL } = require('../shared/config');
 const router = Router();
 
+/**
+ * Handles GET /admin.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/admin', (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ error: auth.error || 'Unauthorized' });

@@ -19,9 +19,21 @@ const { buildContextForClaude } = require('../shared/context-engine');
 
 // Dependency injection for safePythonSpawn (defined in server.js)
 let _safePythonSpawn = null;
+/**
+ * setSafePythonSpawn internal helper.
+ * @param {any} fn - Function input parameter.
+ * @returns {any} Helper return value used by route handlers.
+ */
 function setSafePythonSpawn(fn) { _safePythonSpawn = fn; }
 
 // --- POST /bruce/session/init ---
+/**
+ * Handles POST /bruce/session/init.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/session/init', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -110,6 +122,11 @@ router.post('/bruce/session/init', async (req, res) => {
       ragQueries.push(roadmap[0].step_name);  // sous-query sur la 1ere tache
     }
 
+    /**
+     * embedAndSearch internal helper.
+     * @param {any} queryText - Function input parameter.
+     * @returns {any} Helper return value used by route handlers.
+     */
     const embedAndSearch = async (queryText) => {
       try {
         const embedRes = await fetchWithTimeout(
@@ -464,6 +481,13 @@ Sois direct, precis, actionnable.`;
 // Output: { ok, session_id, session_summary, checklist, warnings }
 // ─────────────────────────────────────────────────────────────────────────────
 // --- GET /bruce/session/close/checklist ---
+/**
+ * Handles GET /bruce/session/close/checklist.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.get('/bruce/session/close/checklist', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -691,6 +715,13 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
 //   handoff_next: string (message pour la prochaine session)
 // ─────────────────────────────────────────────────────────────────────────────
 // --- POST /bruce/session/close ---
+/**
+ * Handles POST /bruce/session/close.
+ * Expected params: request path/query/body fields consumed by this handler.
+ * @param {import('express').Request} req - Express request containing endpoint parameters.
+ * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
+ * @returns {Promise<void>|void} Sends the HTTP JSON response.
+ */
 router.post('/bruce/session/close', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -716,6 +747,11 @@ router.post('/bruce/session/close', async (req, res) => {
   const hSupa = { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
 
   // ── Helper: hash simple pour content_hash ──
+  /**
+   * simpleHash internal helper.
+   * @param {any} str - Function input parameter.
+   * @returns {any} Helper return value used by route handlers.
+   */
   function simpleHash(str) {
     let h = 0;
     for (let i = 0; i < str.length; i++) {
@@ -726,6 +762,13 @@ router.post('/bruce/session/close', async (req, res) => {
   }
 
   // ── Helper: push un item vers staging_queue ──
+  /**
+   * pushToStaging internal helper.
+   * @param {any} tableCible - Function input parameters.
+   * @param {any} contenuJson - Additional function input parameter.
+   * @param {any} intent - Additional function input parameter.
+   * @returns {any} Helper return value used by route handlers.
+   */
   async function pushToStaging(tableCible, contenuJson, intent) {
     const payload = {
       table_cible: tableCible,
