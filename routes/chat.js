@@ -4,6 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const { randomUUID } = require('crypto');
+const fs = require('fs');
 const { validateBruceAuth } = require('../shared/auth');
 const {
   SUPABASE_URL, SUPABASE_KEY, BRUCE_LLM_API_BASE, BRUCE_LLM_API_KEY,
