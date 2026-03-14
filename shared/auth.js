@@ -55,12 +55,11 @@ function checkRateLimit(tokenHash, rpm) {
 }
 
 /**
- * Validate auth + resolve scopes. SYNCHRONOUS — safe for all handlers.
- * Returns { ok, client_type?, scopes?, status?, error? }
- *
- * Usage:
- *   const auth = validateBruceAuth(req);           // basic auth check (backward compat)
- *   const auth = validateBruceAuth(req, 'docker');  // auth + scope check
+ * Validates the Bruce auth token from request headers and optionally enforces a required scope.
+ * Supports cached multi-token auth and a legacy single-token fallback.
+ * @param {import('express').Request} req - Incoming request containing auth headers.
+ * @param {string} [requiredScope] - Optional scope required for the authenticated token.
+ * @returns {{ ok: boolean, client_type?: string, scopes?: string[], status?: number, error?: string }} Authentication result payload.
  */
 function validateBruceAuth(req, requiredScope) {
   // ── Extract token from headers ──
@@ -111,8 +110,10 @@ function validateBruceAuth(req, requiredScope) {
 }
 
 /**
- * Express middleware factory: require scope on a route.
- * Usage: app.use('/bruce/docker', requireScope('docker'));
+ * Creates an Express middleware that requires a specific Bruce token scope.
+ * Attaches resolved auth metadata to req.bruceAuth when authorization succeeds.
+ * @param {string} scope - Scope required to access the protected route.
+ * @returns {(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => void} Scope-checking middleware.
  */
 function requireScope(scope) {
   return (req, res, next) => {
