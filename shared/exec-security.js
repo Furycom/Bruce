@@ -28,9 +28,9 @@ const BLACKLIST = [
 ];
 
 /**
- * Valide une commande exec.
- * @param {string} cmd - Commande à valider
- * @returns {{ allowed: boolean, reason?: string }}
+ * Validates whether an exec command is allowed using blacklist and whitelist rules.
+ * @param {string} cmd - Raw shell command to validate.
+ * @returns {{ allowed: boolean, reason?: string }} Validation result with an optional deny reason.
  */
 function validateExecCommand(cmd) {
   const trimmed = (cmd || '').trim();
@@ -54,7 +54,15 @@ function validateExecCommand(cmd) {
 }
 
 /**
- * Log audit entry to Supabase bruce_audit_log (fire-and-forget).
+ * Writes an exec audit entry to Supabase in fire-and-forget mode.
+ * Currently returns immediately because logging is disabled.
+ * @param {string} endpoint - API endpoint that triggered the exec action.
+ * @param {string} caller - Caller identity or client type.
+ * @param {string} host - Target host for the command execution context.
+ * @param {string} cmd - Executed command string.
+ * @param {string} result - Execution outcome label.
+ * @param {number} durationMs - Command duration in milliseconds.
+ * @returns {void} No return value.
  */
 function auditLog(endpoint, caller, host, cmd, result, durationMs) {
   // DISABLED: table bruce_audit_log inexistante/vidée, voir [840].

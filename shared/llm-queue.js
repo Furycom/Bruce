@@ -12,6 +12,10 @@ const { stripThinkBlock } = require('./helpers');
 let llmInFlight = 0;
 const llmQueue = [];
 
+/**
+ * Acquires a concurrency slot for an LLM call, queueing when capacity is reached.
+ * @returns {Promise<void>} Resolves when execution is allowed to proceed.
+ */
 function acquireLlmSlot() {
   if (llmInFlight < BRUCE_MAX_CONCURRENT) {
     llmInFlight += 1;
@@ -23,6 +27,10 @@ function acquireLlmSlot() {
   });
 }
 
+/**
+ * Releases a previously acquired LLM concurrency slot and wakes the next waiter.
+ * @returns {void} No return value.
+ */
 function releaseLlmSlot() {
   llmInFlight = Math.max(0, llmInFlight - 1);
   if (llmQueue.length > 0 && llmInFlight < BRUCE_MAX_CONCURRENT) {
@@ -34,6 +42,12 @@ function releaseLlmSlot() {
   }
 }
 
+/**
+ * Sends a chat completion request to the configured LLM backend with queue-based throttling.
+ * @param {{role: string, content: string}[]} messages - Conversation messages for the completion request.
+ * @returns {Promise<{role: string, content: string}>} Assistant message normalized from backend response.
+ * @throws {Error} Throws when LLM settings are missing or the backend response is invalid.
+ */
 async function callLlm(messages) {
   if (!BRUCE_LLM_API_BASE || !BRUCE_LLM_MODEL) {
     throw new Error('BRUCE_LLM_API_BASE or BRUCE_LLM_MODEL not configured');
