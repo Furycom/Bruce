@@ -15,6 +15,13 @@ const { utcNowIso, logFallback, stripThinkBlock } = require('../shared/helpers')
 const { insertMemoryEvent, insertConversationMessage } = require('../shared/supabase-client');
 const { callLlm } = require('../shared/llm-queue');
 const { fetchWithTimeout } = require('../shared/fetch-utils');
+const {
+  clampStr,
+  parseLegacyToolCallFromContent,
+  extractSshCredsFromPrompt,
+  safeJsonParse,
+  buildSystemPrompt,
+} = require('../shared/chat-helpers');
 const { bruceRagContext } = require('./rag');
 
 // --- LLM PROXY HELPERS ---
@@ -507,39 +514,6 @@ try {
   SYSTEM_PROMPT = "";
 }
 
-function clampStr(s, maxLen) {
-  const x = String(s ?? "");
-  if (x.length <= maxLen) return x;
-  return x.slice(0, maxLen) + `\n...[truncated to ${maxLen} chars]`;
-}
-
-function parseLegacyToolCallFromContent(content) {
-  const s = String(content || "");
-  const m = s.match(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/i);
-  if (!m || !m[1]) return null;
-  try {
-    const obj = JSON.parse(m[1]);
-    const name = obj && obj.name ? String(obj.name) : null;
-    const args = obj && obj.arguments && typeof obj.arguments === "object" ? obj.arguments : {};
-    return name ? { name, arguments: args } : null;
-  } catch (e) {
-    console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', e.message || e);
-    return null;
-  }
-}
-// Extraire user/password depuis system_prompt.txt (évite de hardcoder un secret ici)
-function extractSshCredsFromPrompt(promptText) {
-  const out = { user: null, password: null };
-
-  const userMatch = String(promptText).match(/^\s*-\s*User:\s*(.+)\s*$/mi);
-  if (userMatch && userMatch[1]) out.user = userMatch[1].trim();
-
-  const passMatch = String(promptText).match(/^\s*-\s*Password:\s*(.+)\s*$/mi);
-  if (passMatch && passMatch[1]) out.password = passMatch[1].trim();
-
-  return out;
-}
-
 const SSH_CREDS = extractSshCredsFromPrompt(SYSTEM_PROMPT);
 const SSH_USER = SSH_CREDS.user || "furycom";
 
@@ -913,7 +887,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
   try {
   let body = req.body;
   if (typeof body === "string") {
-    try { body = JSON.parse(body); } catch (_) { body = {}; }
+    body = safeJsonParse(body, {});
   }
     const raw = (body && (body.message || body.prompt || body.query)) || "";
     const msg = String(raw || "").trim();
@@ -972,11 +946,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
     }
 
     // Construire messages pour vLLM
-    const messages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      ...conversation_history,
-      { role: "user", content: String(message) }
-    ];
+    const messages = buildSystemPrompt(SYSTEM_PROMPT, conversation_history, message);
 
     const upstream = `${base}/chat/completions`;
     const timeoutMs = bruceAgentTimeoutMs();
@@ -1006,7 +976,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
       return res.status(502).json({ success: false, error: `LLM error: ${r1.status} ${r1.statusText}`, details: clampStr(t1, 4000) });
     }
 
-    const vllmData = JSON.parse(t1);
+    const vllmData = safeJsonParse(t1, null);
     const assistantMessage = vllmData && vllmData.choices && vllmData.choices[0] && vllmData.choices[0].message;
     if (!assistantMessage) {
       return res.status(502).json({ success: false, error: "LLM response missing choices[0].message" });
@@ -1033,12 +1003,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
         const toolName = toolCall && toolCall.function && toolCall.function.name ? toolCall.function.name : null;
         const rawArgs = toolCall && toolCall.function && toolCall.function.arguments ? toolCall.function.arguments : "{}";
 
-        let toolParams = {};
-        try {
-          toolParams = JSON.parse(rawArgs);
-        } catch (_) {
-          toolParams = { _raw: String(rawArgs) };
-        }
+        const toolParams = safeJsonParse(rawArgs, { _raw: String(rawArgs) });
 
         const result = await executeTool(toolName, toolParams);
 
@@ -1080,7 +1045,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
         return res.status(502).json({ success: false, error: `LLM follow-up error: ${r2.status} ${r2.statusText}`, details: clampStr(t2, 4000) });
       }
 
-      const followUpData = JSON.parse(t2);
+      const followUpData = safeJsonParse(t2, null);
       const finalResponse =
         followUpData &&
         followUpData.choices &&
@@ -1094,12 +1059,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
         success: true,
         response: finalResponse,
         tools_used: assistantMessage.tool_calls.map((tc) => {
-          let args = {};
-          try {
-            args = JSON.parse(tc.function.arguments || "{}");
-          } catch (_) {
-            args = { _raw: String(tc.function.arguments || "") };
-          }
+          const args = safeJsonParse(tc.function.arguments || "{}", { _raw: String(tc.function.arguments || "") });
           return { name: tc.function.name, arguments: args };
         })
       });
