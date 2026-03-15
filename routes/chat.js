@@ -19,10 +19,21 @@ const { bruceRagContext } = require('./rag');
 
 // --- LLM PROXY HELPERS ---
 
+  /**
+   * Internal helper function `bruceLlmBase`.
+   * @returns {any} Computed helper result.
+   */
   function bruceLlmBase() {
     return String(BRUCE_LLM_API_BASE || "").replace(/\/+$/, "");
   }
 
+  /**
+   * Internal helper function `bruceFetchWithTimeout`.
+   * @param {any} url - Function input parameter.
+   * @param {any} opts - Function input parameter.
+   * @param {any} timeoutMs - Function input parameter.
+   * @returns {Promise<any>} Computed helper result.
+   */
   async function bruceFetchWithTimeout(url, opts, timeoutMs) {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), timeoutMs);
@@ -37,6 +48,13 @@ const { bruceRagContext } = require('./rag');
 // --- ROUTE HANDLERS ---
 
 // GET /bruce/config/llm
+/**
+ * Handles GET /bruce/config/llm.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {void} Sends an HTTP response for the endpoint.
+ */
 router.get("/bruce/config/llm", (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -49,6 +67,13 @@ router.get("/bruce/config/llm", (req, res) => {
 });
 
 // /bruce/llm/models
+  /**
+   * Handles GET /bruce/llm/models.
+   * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+   * @param {import('express').Request} req - Express request object.
+   * @param {import('express').Response} res - Express response object.
+   * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+   */
   router.get("/bruce/llm/models", async (req, res) => {
     const auth = validateBruceAuth(req);
     if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -78,6 +103,13 @@ router.get("/bruce/config/llm", (req, res) => {
   });
 
 // /bruce/llm/chat
+  /**
+   * Handles POST /bruce/llm/chat.
+   * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+   * @param {import('express').Request} req - Express request object.
+   * @param {import('express').Response} res - Express response object.
+   * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+   */
   router.post("/bruce/llm/chat", async (req, res) => {
     const auth = validateBruceAuth(req);
     if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error || "Unauthorized" });
@@ -126,16 +158,31 @@ router.get("/bruce/config/llm", (req, res) => {
   // Also exposed as /v1/* for convenience.
   // =========================================================
 
+  /**
+   * Internal helper function `openaiUnixNow`.
+   * @returns {any} Computed helper result.
+   */
   function openaiUnixNow() {
     return Math.floor(Date.now() / 1000);
   }
 
+  /**
+   * Internal helper function `openaiMakeId`.
+   * @param {any} prefix - Function input parameter.
+   * @returns {any} Computed helper result.
+   */
   function openaiMakeId(prefix) {
     return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Math.random()
       .toString(36)
       .slice(2, 10)}`;
   }
 
+  /**
+   * Internal helper function `openaiSendAuthError`.
+   * @param {any} res - Function input parameter.
+   * @param {any} auth - Function input parameter.
+   * @returns {any} Computed helper result.
+   */
   function openaiSendAuthError(res, auth) {
     return res.status(auth.status || 401).json({
       error: {
@@ -145,6 +192,12 @@ router.get("/bruce/config/llm", (req, res) => {
     });
   }
 
+  /**
+   * Internal helper function `openaiModelsHandler`.
+   * @param {any} req - Function input parameter.
+   * @param {any} res - Function input parameter.
+   * @returns {Promise<any>} Computed helper result.
+   */
   async function openaiModelsHandler(req, res) {
     const auth = validateBruceAuth(req);
     if (!auth.ok) return openaiSendAuthError(res, auth);
@@ -163,6 +216,12 @@ router.get("/bruce/config/llm", (req, res) => {
     });
   }
 
+  /**
+   * Internal helper function `openaiChatCompletionsHandler`.
+   * @param {any} req - Function input parameter.
+   * @param {any} res - Function input parameter.
+   * @returns {Promise<any>} Computed helper result.
+   */
   async function openaiChatCompletionsHandler(req, res) {
     const auth = validateBruceAuth(req);
     if (!auth.ok) return openaiSendAuthError(res, auth);
@@ -255,6 +314,13 @@ router.get("/bruce/config/llm", (req, res) => {
     }
   }
 
+  /**
+   * Handles GET /api/openai/v1/models.
+   * Expects request parameters in path/query/body depending on endpoint contract and returns an HTTP response payload.
+   * @param {import('express').Request} req - Express request object carrying endpoint input parameters.
+   * @param {import('express').Response} res - Express response object used to send endpoint output.
+   * @returns {void|Promise<void>} Sends the endpoint response to the client.
+   */
   router.get('/api/openai/v1/models', openaiModelsHandler);
   router.get('/v1/models', openaiModelsHandler);
 
@@ -262,6 +328,13 @@ router.get("/bruce/config/llm", (req, res) => {
   router.post('/v1/chat/completions', openaiChatCompletionsHandler);
 
 // --- /bruce/llm/generate ---
+/**
+ * Handles POST /bruce/llm/generate.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/bruce/llm/generate', async (req, res) => {
   // RAG strict gate (rag===true only)
   // If caller didn't explicitly set rag:true, we skip retrieval + injection completely.
@@ -367,6 +440,13 @@ router.post('/bruce/llm/generate', async (req, res) => {
 });
 
 // --- /chat ---
+/**
+ * Handles POST /chat.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/chat', async (req, res) => {
   // Auth
   const authCheck = validateBruceAuth(req);
@@ -507,12 +587,23 @@ try {
   SYSTEM_PROMPT = "";
 }
 
+/**
+ * Internal helper function `clampStr`.
+ * @param {any} s - Function input parameter.
+ * @param {any} maxLen - Function input parameter.
+ * @returns {any} Computed helper result.
+ */
 function clampStr(s, maxLen) {
   const x = String(s ?? "");
   if (x.length <= maxLen) return x;
   return x.slice(0, maxLen) + `\n...[truncated to ${maxLen} chars]`;
 }
 
+/**
+ * Internal helper function `parseLegacyToolCallFromContent`.
+ * @param {any} content - Function input parameter.
+ * @returns {any} Computed helper result.
+ */
 function parseLegacyToolCallFromContent(content) {
   const s = String(content || "");
   const m = s.match(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/i);
@@ -528,6 +619,11 @@ function parseLegacyToolCallFromContent(content) {
   }
 }
 // Extraire user/password depuis system_prompt.txt (évite de hardcoder un secret ici)
+/**
+ * Internal helper function `extractSshCredsFromPrompt`.
+ * @param {any} promptText - Function input parameter.
+ * @returns {any} Computed helper result.
+ */
 function extractSshCredsFromPrompt(promptText) {
   const out = { user: null, password: null };
 
@@ -557,6 +653,13 @@ try {
   }
 }
 
+/**
+ * Internal helper function `sshExecViaNodeSsh`.
+ * @param {any} host - Function input parameter.
+ * @param {any} command - Function input parameter.
+ * @param {any} timeoutMs - Function input parameter.
+ * @returns {Promise<any>} Computed helper result.
+ */
 async function sshExecViaNodeSsh(host, command, timeoutMs) {
   if (!NodeSSH) {
     throw new Error("node-ssh introuvable (vérifie l'installation npm dans /home/furycom/mcp-stack/mcp-gateway).");
@@ -717,6 +820,12 @@ const AVAILABLE_TOOLS = [
 ];
 
 // Fonction pour exécuter un tool
+/**
+ * Internal helper function `executeTool`.
+ * @param {any} toolName - Function input parameter.
+ * @param {any} params - Function input parameter.
+ * @returns {Promise<any>} Computed helper result.
+ */
 async function executeTool(toolName, params) {
   const safeParams = params && typeof params === "object" ? params : {};
   const host = safeParams.host ? String(safeParams.host) : "";
@@ -887,16 +996,31 @@ async function executeTool(toolName, params) {
   }
 }
 
+/**
+ * Internal helper function `bruceAgentLlmBase`.
+ * @returns {any} Computed helper result.
+ */
 function bruceAgentLlmBase() {
   // BRUCE_LLM_API_BASE est déjà utilisé ailleurs dans server.js (ex: /bruce/config/llm)
   return String(BRUCE_LLM_API_BASE || "").replace(/\/+$/, "");
 }
 
+/**
+ * Internal helper function `bruceAgentTimeoutMs`.
+ * @returns {any} Computed helper result.
+ */
 function bruceAgentTimeoutMs() {
   const n = parseInt(String(BRUCE_LLM_TIMEOUT_MS || ""), 10);
   return Number.isFinite(n) && n > 0 ? n : 180000;
 }
 
+/**
+ * Internal helper function `bruceAgentFetchWithTimeout`.
+ * @param {any} url - Function input parameter.
+ * @param {any} opts - Function input parameter.
+ * @param {any} timeoutMs - Function input parameter.
+ * @returns {Promise<any>} Computed helper result.
+ */
 async function bruceAgentFetchWithTimeout(url, opts, timeoutMs) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
@@ -908,6 +1032,13 @@ async function bruceAgentFetchWithTimeout(url, opts, timeoutMs) {
 }
 
 // Endpoint principal BRUCE Agent
+/**
+ * Handles POST /bruce/agent/chat.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post("/bruce/agent/chat", async (req, res) => {
   // FAST-PATH: count machines via query_homelab_db (2.1.10)
   try {

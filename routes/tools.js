@@ -4,6 +4,13 @@ const { SUPABASE_URL, SUPABASE_KEY } = require('../shared/config');
 
 const router = Router();
 
+/**
+ * Handles GET /tools.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {void} Sends an HTTP response for the endpoint.
+ */
 router.get('/tools', (req, res) => {
   res.json({
     tools: [
@@ -48,6 +55,13 @@ router.get('/tools', (req, res) => {
   });
 });
 
+/**
+ * Handles POST /tools/echo.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {void} Sends an HTTP response for the endpoint.
+ */
 router.post('/tools/echo', (req, res) => {
   res.json({
     ok: true,
@@ -56,6 +70,13 @@ router.post('/tools/echo', (req, res) => {
   });
 });
 
+/**
+ * Handles POST /tools/supabase/exec-sql.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/tools/supabase/exec-sql', async (req, res) => {
   try {
     const sql = String((req.body && (req.body.sql || req.body.query)) ? (req.body.sql || req.body.query) : '').trim().replace(/;+\s*$/, '');

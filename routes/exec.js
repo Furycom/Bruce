@@ -11,6 +11,13 @@ const router = Router();
 // router.use(requireScope('exec'));
 
 // ── POST /bruce/exec — execute whitelisted commands ──
+/**
+ * Handles POST /bruce/exec.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/bruce/exec', async (req, res) => {
   const auth = validateBruceAuth(req, 'exec');
   if (!auth.ok) return res.status(401).json({ error: auth.error });

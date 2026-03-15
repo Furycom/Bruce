@@ -6,10 +6,11 @@ const { requireScope } = require('../shared/auth');
 const router = express.Router();
 
 /**
- * POST /bruce/search
- * Proxy RAG search: embed query → pgvector hybrid search → return results.
- * Body: { query: string, top_k?: number (1-20, default 5), threshold?: number (0-1, default 0.01) }
- * Requires scope: read
+ * Handles POST / (mounted as POST /bruce/search) and executes the RAG search pipeline.
+ * Expects body params { query: string, top_k?: number, threshold?: number } and requires read scope via `requireScope('read')`.
+ * @param {import('express').Request} req - Express request containing query text and optional ranking parameters in req.body.
+ * @param {import('express').Response} res - Express response used to send validation errors, upstream errors, or ranked matches.
+ * @returns {Promise<void>} Sends a JSON response with result rows and request latency.
  */
 router.post('/', requireScope('read'), async (req, res) => {
   const start = Date.now();

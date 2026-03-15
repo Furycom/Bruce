@@ -6,6 +6,13 @@ const { validateBruceAuth } = require('../shared/auth');
 const router = Router();
 
 // POST /bruce/staging/validate — via validate_service HTTP sur hote port 4001
+/**
+ * Handles POST /bruce/staging/validate.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/bruce/staging/validate', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(401).json({ error: auth.error });
@@ -21,6 +28,13 @@ router.post('/bruce/staging/validate', async (req, res) => {
 });
 
 // GET /bruce/staging/status — etat staging_queue
+/**
+ * Handles GET /bruce/staging/status.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.get('/bruce/staging/status', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(401).json({ error: auth.error });

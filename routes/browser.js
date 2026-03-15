@@ -5,6 +5,13 @@ const BROWSERLESS_URL = process.env.BROWSERLESS_URL || 'http://192.168.2.174:300
 
 const router = Router();
 
+/**
+ * Handles POST /bruce/browser/fetch.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/bruce/browser/fetch', async (req, res) => {
   const { url, wait_for, timeout = 15000 } = req.body || {};
   if (!url) return res.status(400).json({ ok: false, error: 'url required' });
@@ -21,6 +28,13 @@ router.post('/bruce/browser/fetch', async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
+/**
+ * Handles POST /bruce/browser/screenshot.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/bruce/browser/screenshot', async (req, res) => {
   const { url, full_page = false, timeout = 15000 } = req.body || {};
   if (!url) return res.status(400).json({ ok: false, error: 'url required' });
@@ -38,6 +52,13 @@ router.post('/bruce/browser/screenshot', async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
+/**
+ * Handles POST /bruce/browser/scrape.
+ * Expects request parameters in path/query/body depending on endpoint contract and returns a JSON response.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Sends an HTTP response for the endpoint.
+ */
 router.post('/bruce/browser/scrape', async (req, res) => {
   const { url, selector, timeout = 15000 } = req.body || {};
   if (!url) return res.status(400).json({ ok: false, error: 'url required' });
