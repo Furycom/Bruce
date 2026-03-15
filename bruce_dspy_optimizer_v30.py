@@ -1305,12 +1305,21 @@ def _handle_sigterm(signum, frame):
     raise SystemExit(143)
 
 
+def _handle_timeout(signum, frame):
+    log.error("GLOBAL TIMEOUT after 14h")
+    raise SystemExit(124)
+
+
 def main():
     # ─── Lockfile ───────────────────────────────────────────────────────────
     lock_fh = acquire_lock()
     previous_sigterm_handler = signal.getsignal(signal.SIGTERM)
+    previous_sigalrm_handler = signal.getsignal(signal.SIGALRM)
     signal.signal(signal.SIGTERM, _handle_sigterm)
+    signal.signal(signal.SIGALRM, _handle_timeout)
     try:
+        signal.alarm(50400)  # 14h max runtime watchdog for unattended runs
+
         log.info("=" * 70)
         log.info("BRUCE DSPy Optimizer v2.9 — Démarrage")
         log.info(f"PID: {os.getpid()}")
@@ -1404,6 +1413,7 @@ def main():
             log.error(f"❌ MIPROv2 échoué: {e}")
             log.info("Sauvegarde du programme baseline comme fallback...")
             optimized_program = baseline_module
+            log.info("Continuing with baseline (non-optimized) for phases 3-4")
             save_progress("mipro_failed", 0, 0, extra={"error": str(e)})
 
         # ─── Phase 3: Évaluation post-MIPROv2 sur DEV ───────────────────────
@@ -1465,7 +1475,15 @@ def main():
 
         log.info("✅ DSPy v2.9 terminé avec succès.")
         return results
+    except SystemExit:
+        raise
+    except Exception as e:
+        log.error(f"❌ Erreur fatale non gérée: {e}", exc_info=True)
+        save_progress("fatal_error", 0, 0, extra={"error": str(e)})
+        raise
     finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous_sigalrm_handler)
         signal.signal(signal.SIGTERM, previous_sigterm_handler)
         lock_fh.close()
         if os.path.exists(LOCK_FILE):
