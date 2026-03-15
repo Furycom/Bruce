@@ -1,0 +1,6 @@
+# litellm_config.yaml — BRUCE LiteLLM proxy config
+# Modèles configurés dynamiquement via API
+# Ce fichier est un placeholder — la vraie config est dans litellm-stack/ sur le serveur
+model_list: []
+general_settings:
+  master_key: "env:LITELLM_MASTER_KEY"

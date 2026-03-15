@@ -1,20 +1,4 @@
 services:
-  code-server:
-    image: lscr.io/linuxserver/code-server:latest
-    container_name: code-server
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/Toronto
-      - PASSWORD=mcpServer2024!
-      - SUDO_PASSWORD=mcpServer2024!
-    volumes:
-      - ./config:/config
-      - .:/config/workspace
-    ports:
-      - "8080:8443"
-    restart: unless-stopped
-
   mcp-gateway:
     env_file:
       - .env
@@ -23,6 +7,8 @@ services:
       dockerfile: mcp-gateway/Dockerfile
     container_name: mcp-gateway
     restart: unless-stopped
+    mem_limit: 256m
+    cpus: '1.0'
     ports:
       - "4000:4000"
     environment:
@@ -58,3 +44,27 @@ services:
       retries: 3
       start_period: 15s
 
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm-proxy
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: '1.5'
+    ports:
+      - "4100:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml:ro
+    environment:
+      - LITELLM_MASTER_KEY=${BRUCE_LITELLM_KEY:-bruce-litellm-key-01}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-pk-bruce-langfuse-2026}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-sk-bruce-langfuse-2026}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://192.168.2.154:3200}
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - default
