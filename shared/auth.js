@@ -35,7 +35,7 @@ function refreshTokenCache() {
         _tokenCache = await res.json();
         _tokenCacheAt = Date.now();
       }
-    } catch { /* keep stale cache */ }
+    } catch (error) { console.error(`[auth.js] operation failed:`, error.message); /* keep stale cache */ }
     _loadingPromise = null;
   })();
 }
@@ -97,7 +97,7 @@ function validateBruceAuth(req, requiredScope) {
           method: 'PATCH',
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ last_used: new Date().toISOString() }),
-        }).catch(() => {});
+        }).catch((error) => { console.error(`[auth.js] operation failed:`, error.message); });
       }
       return { ok: true, client_type: match.client_type, scopes: match.scopes };
     }

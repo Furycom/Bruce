@@ -112,7 +112,7 @@ async function loadLLMProfile(identity) {
       _profileCache = { data: map, ts: now };
       if (map[identity]) return map[identity];
     }
-  } catch (e) { /* Supabase indisponible — fallback */ }
+  } catch (e) { console.error(`[llm-profiles.js] operation failed:`, e.message); /* Supabase indisponible — fallback */ }
   return LLM_PROFILES_FALLBACK[identity] || LLM_PROFILES_FALLBACK['claude'];
 }
 
@@ -145,7 +145,7 @@ function buildContextForProfile(profile, dashboard, tasks, lessons, ragResults, 
         if (Array.isArray(cs.next_opus) && cs.next_opus.length > 0) csLines.push('- Next Opus: ' + cs.next_opus.slice(0,2).join(', '));
         if (Array.isArray(cs.blockers) && cs.blockers.length > 0) csLines.push('- Blockers: ' + cs.blockers.join(', '));
         parts.push(csLines.join('\n'));
-      } catch(e) {
+      } catch(e) { console.error(`[llm-profiles.js] operation failed:`, e.message);
         parts.push('**ÉTAT COURANT:** ' + String(csEntry.value).slice(0, 300));
       }
     }
@@ -160,7 +160,7 @@ function buildContextForProfile(profile, dashboard, tasks, lessons, ragResults, 
           const svcLine = sc.services.map(s => s.name + '(' + (s.url || '').replace('http://','').split('/')[0] + ')').join(' | ');
           parts.push('**SERVICES:** ' + svcLine);
         }
-      } catch(e) {}
+      } catch(e) { console.error(`[llm-profiles.js] operation failed:`, e.message);}
     }
   }
 

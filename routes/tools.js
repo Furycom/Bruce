@@ -124,7 +124,7 @@ router.post('/tools/supabase/exec-sql', async (req, res) => {
     let parsed;
     try {
       parsed = text ? JSON.parse(text) : null;
-    } catch (e) {
+    } catch (e) { console.error(`[tools.js] operation failed:`, e.message);
       return res.status(200).json({
         ok: false,
         status: response.status,
@@ -138,7 +138,7 @@ router.post('/tools/supabase/exec-sql', async (req, res) => {
       : parsed;
 
     return res.status(200).json({ ok: true, status: response.status, data });
-  } catch (err) {
+  } catch (err) { console.error(`[tools.js] operation failed:`, err.message);
     return res.status(200).json({
       ok: false,
       status: 500,

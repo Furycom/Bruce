@@ -25,7 +25,7 @@ router.post('/bruce/browser/fetch', async (req, res) => {
     if (!response.ok) return res.status(502).json({ ok: false, error: 'Browserless error ' + response.status });
     const html = await response.text();
     res.json({ ok: true, url, length: html.length, html: html.substring(0, 50000) });
-  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+  } catch (e) { console.error(`[browser.js] operation failed:`, e.message); res.status(500).json({ ok: false, error: e.message }); }
 });
 
 /**
@@ -49,7 +49,7 @@ router.post('/bruce/browser/screenshot', async (req, res) => {
     const buf = await response.arrayBuffer();
     const b64 = Buffer.from(buf).toString('base64');
     res.json({ ok: true, url, format: 'png', size_bytes: buf.byteLength, base64: b64 });
-  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+  } catch (e) { console.error(`[browser.js] operation failed:`, e.message); res.status(500).json({ ok: false, error: e.message }); }
 });
 
 /**
@@ -72,7 +72,7 @@ router.post('/bruce/browser/scrape', async (req, res) => {
     if (!response.ok) return res.status(502).json({ ok: false, error: 'Browserless error ' + response.status });
     const data = await response.json();
     res.json({ ok: true, url, data });
-  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+  } catch (e) { console.error(`[browser.js] operation failed:`, e.message); res.status(500).json({ ok: false, error: e.message }); }
 });
 
 module.exports = router;

@@ -108,7 +108,7 @@ async function buildAnchorLayer(currentState, dashboard) {
         }
       }
     }
-  } catch (e) { /* non-bloquant */ }
+  } catch (e) { console.error(`[context-engine.js] operation failed:`, e.message); /* non-bloquant */ }
 
   // 1c. Dashboard compact
   if (dashboard) {
@@ -135,7 +135,7 @@ function buildSessionLayer(tasks, lessons, ragResults, topic) {
     const topTasks = tasks.filter(t => t.priority <= 2).slice(0, 5);
     if (topTasks.length > 0) {
       const taskLines = topTasks.map(t =>
-        `[${t.id}] P${t.priority} ${t.model_hint||''} ${t.step_name}`
+        `[{t.id}] P${t.priority} ${t.model_hint||''} ${t.step_name}`
       );
       const taskText = '**TÂCHES PRIORITAIRES:**\n' + taskLines.join('\n');
       parts.push(truncateToTokens(taskText, Math.min(400, budget - usedTokens)));

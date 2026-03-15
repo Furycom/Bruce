@@ -80,7 +80,7 @@ router.all('/bruce/tools/unlocked', async (req, res) => {
 
     for (const row of rows) {
       let reqs;
-      try { reqs = JSON.parse(row.unblocked_by); } catch (_) { continue; }
+      try { reqs = JSON.parse(row.unblocked_by); } catch (_) { console.error(`[tools-unlock.js] operation failed:`, _.message); continue; }
       if (!Array.isArray(reqs)) continue;
       const missing = reqs.filter(r => !caps.includes(r));
       const entry = { id: row.id, name: row.name, tag: row.capability_tag, status: row.status };
@@ -102,7 +102,7 @@ router.all('/bruce/tools/unlocked', async (req, res) => {
       summary: `${unblocked.length} tools ready, ${blocked.length} blocked`
     });
 
-  } catch (e) {
+  } catch (e) { console.error(`[tools-unlock.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 });

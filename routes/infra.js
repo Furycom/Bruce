@@ -64,7 +64,7 @@ router.get('/health', async (req, res) => {
       const ping = await pingUrl(SUPABASE_URL);
       result.supabase.status = ping.status;
       if (ping.error) result.supabase.error = ping.error;
-    } catch (err) {
+    } catch (err) { console.error(`[infra.js] operation failed:`, err.message);
       result.supabase.status = 'offline';
       result.supabase.error = err.message || String(err);
     }
@@ -75,7 +75,7 @@ router.get('/health', async (req, res) => {
   try {
     const stats = fs.statSync(MANUAL_ROOT);
     result.manual.accessible = stats.isDirectory();
-  } catch (err) {
+  } catch (err) { console.error(`[infra.js] operation failed:`, err.message);
     result.manual.accessible = false;
     result.manual.error = err.message || String(err);
   }
@@ -132,7 +132,7 @@ router.get('/bruce/state', async (req, res) => {
       dashboard, current_state: state, critical_lessons: lessons,
       top_decisions: decisions, roadmap_todo: roadmap, knowledge_graph: kg,
     });
-  } catch (e) {
+  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 });
@@ -181,7 +181,7 @@ router.get('/bruce/issues/open', async (req, res) => {
     const data = (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'data' in parsed) ? parsed.data : parsed;
     // TODO(contract-v2): migrate success payload to { ok: true, data } without breaking current consumers.
     return res.json({ ok: true, status: response.status, data });
-  } catch (err) {
+  } catch (err) { console.error(`[infra.js] operation failed:`, err.message);
     return res.status(500).json({ ok: false, error: err && err.message ? err.message : String(err) });
   }
 });
@@ -248,7 +248,7 @@ router.get('/bruce/topology', async (req, res) => {
         id: t.id, name: t.name, category: t.category, tool_type: t.tool_type, status: t.status
       }))
     });
-  } catch (e) {
+  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     console.error('[/bruce/topology] Error:', e.message);
     return res.status(500).json({ ok: false, error: e.message });
   }
@@ -285,7 +285,7 @@ router.post('/bruce/maintenance/run', async (req, res) => {
     child.unref();
     fs.closeSync(out);
     return res.json({ ok: true, started: true, pid: child.pid, script: scriptPath, args: argsStr, log: logFile, timestamp: new Date().toISOString() });
-  } catch (e) {
+  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message) });
   }
 });
@@ -309,7 +309,7 @@ router.post('/bruce/sync/homelab-hub', async (req, res) => {
     child.unref();
     fs.closeSync(out);
     return res.json({ ok: true, started: true, pid: child.pid, log: logFile, timestamp: new Date().toISOString() });
-  } catch (e) {
+  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message) });
   }
 });
@@ -345,7 +345,7 @@ router.get('/bruce/integrity', async (req, res) => {
         new Promise((_, reject) => setTimeout(() => reject(new Error('check_timeout')), GLOBAL_TIMEOUT_MS - 500))
       ]);
       return { name, ...result };
-    } catch (e) {
+    } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
       return { name, ok: false, error: String(e.message || e) };
     }
   }
@@ -403,7 +403,7 @@ router.get('/bruce/integrity', async (req, res) => {
       Promise.allSettled(checkFns),
       new Promise((_, reject) => setTimeout(() => reject(new Error('global_integrity_timeout')), GLOBAL_TIMEOUT_MS))
     ]);
-  } catch (e) {
+  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     return res.status(500).json({
       ok: false, generated_at: new Date().toISOString(),
       checks: { _timeout: { ok: false, error: 'Global timeout after ' + GLOBAL_TIMEOUT_MS + 'ms' } },
@@ -488,7 +488,7 @@ router.post('/bruce/bootstrap', async (req, res) => {
       clarifications_pending: sessionData.clarifications_pending || [],
       rag_context: sessionData.rag_context || []
     });
-  } catch (e) {
+  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e), elapsed_ms: Date.now() - startMs });
   }
 });
@@ -522,7 +522,7 @@ router.get('/bruce/llm/status', async (req, res) => {
     } else {
       result.llama_server.status = 'unhealthy_' + healthResp.status;
     }
-  } catch (e) {
+  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     result.llama_server.status = 'down';
     result.llama_server.error = String(e.message || e).substring(0, 100);
   }
@@ -546,7 +546,7 @@ router.get('/bruce/llm/status', async (req, res) => {
         }
       }
     }
-  } catch (e) {
+  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     console.error('[infra.js][/bruce/llm/status] erreur silencieuse:', e.message || e);
   }
 
@@ -560,7 +560,7 @@ router.get('/bruce/llm/status', async (req, res) => {
       const props = await propsResp.json();
       result.llama_server.model = props.default_generation_settings?.model || null;
     }
-  } catch (e) {
+  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     console.error('[infra.js][/bruce/llm/status] erreur silencieuse:', e.message || e);
   }
 
@@ -568,7 +568,7 @@ router.get('/bruce/llm/status', async (req, res) => {
   try {
     const liteResp = await fetchWithTimeout(LITELLM_URL + '/health/liveliness', { method: 'GET' }, 3000);
     result.litellm.status = liteResp.ok ? 'ok' : 'down';
-  } catch (_) {
+  } catch (_) { console.error(`[infra.js] operation failed:`, _.message);
     result.litellm.status = 'down';
   }
 
@@ -582,7 +582,7 @@ router.get('/bruce/llm/status', async (req, res) => {
       result.dspy_job.running = true;
       result.dspy_job.progress = prog;
     }
-  } catch (e) {
+  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     console.error('[infra.js][/bruce/llm/status] erreur silencieuse:', e.message || e);
   }
 

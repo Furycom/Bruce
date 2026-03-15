@@ -79,7 +79,7 @@ router.post('/bruce/ask', async (req, res) => {
         ).join('\n\n');
       }
     }
-  } catch (e) {
+  } catch (e) { console.error(`[ask.js] operation failed:`, e.message);
     ragError = String(e.message);
   }
 
@@ -154,7 +154,7 @@ Reponds de facon concise et actionnable.`;
       model: 'Qwen/Qwen2.5-7B-Instruct-AWQ',
       timestamp: new Date().toISOString()
     });
-  } catch (e) {
+  } catch (e) { console.error(`[ask.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message), rag_error: ragError });
   }
 });

@@ -74,7 +74,7 @@ async function insertMemoryEvent(source, eventType, payload) {
       timestamp: utcNowIso(),
       response_json: json,
     });
-  } catch (err) {
+  } catch (err) { console.error(`[supabase-client.js] operation failed:`, err.message);
     await logFallback({
       kind: 'supabase_memory_events_exception',
       timestamp: utcNowIso(),
@@ -152,7 +152,7 @@ async function insertConversationMessage(eventId, conversationId, role, content)
         content,
       });
     }
-  } catch (err) {
+  } catch (err) { console.error(`[supabase-client.js] operation failed:`, err.message);
     await logFallback({
       kind: 'supabase_conversation_messages_exception',
       timestamp: utcNowIso(),

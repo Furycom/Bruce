@@ -82,7 +82,7 @@ router.post('/bruce/write', async (req, res) => {
           valides: (valData?.validate?.stdout || '').match(/Valides:\s+(\d+)/)?.[1] || '?',
           erreurs: (valData?.validate?.stdout || '').match(/Erreurs:\s+(\d+)/)?.[1] || '?'
         };
-      } catch(ve) {
+      } catch(ve) { console.error(`[data-write.js] operation failed:`, ve.message);
         validateResult = { error: 'validate non disponible: ' + ve.message };
       }
     }
@@ -116,7 +116,7 @@ router.post('/bruce/write', async (req, res) => {
     if (rejectionReason) response.rejection_reason = rejectionReason;
     return res.json(response);
 
-  } catch(e) {
+  } catch(e) { console.error(`[data-write.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 });

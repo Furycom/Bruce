@@ -34,7 +34,7 @@ router.get('/bruce/docker/ps', async (req, res) => {
     }));
     // TODO(contract-v2): migrate success payload to { ok: true, data } without breaking current consumers.
     res.json({ ok: true, count: compact.length, containers: compact });
-  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+  } catch (e) { console.error(`[docker.js] operation failed:`, e.message); res.status(500).json({ ok: false, error: e.message }); }
 });
 
 // ── GET /bruce/docker/inspect/:container — inspect container ──
@@ -67,7 +67,7 @@ router.get('/bruce/docker/inspect/:container', async (req, res) => {
       network: Object.keys(info.NetworkSettings.Networks || {}),
       restartPolicy: info.HostConfig.RestartPolicy,
     });
-  } catch (e) { res.status(e.statusCode === 404 ? 404 : 500).json({ ok: false, error: e.message }); }
+  } catch (e) { console.error(`[docker.js] operation failed:`, e.message); res.status(e.statusCode === 404 ? 404 : 500).json({ ok: false, error: e.message }); }
 });
 
 // ── GET /bruce/docker/logs/:container — container logs ──
@@ -90,7 +90,7 @@ router.get('/bruce/docker/logs/:container', async (req, res) => {
     const lines = raw.split('\n').map(l => l.replace(/^.{8}/, '').trim()).filter(Boolean);
     // TODO(contract-v2): migrate success payload to { ok: true, data } without breaking current consumers.
     res.json({ ok: true, container: req.params.container, lines: lines.length, logs: lines });
-  } catch (e) { res.status(e.statusCode === 404 ? 404 : 500).json({ ok: false, error: e.message }); }
+  } catch (e) { console.error(`[docker.js] operation failed:`, e.message); res.status(e.statusCode === 404 ? 404 : 500).json({ ok: false, error: e.message }); }
 });
 
 // ── GET /bruce/docker/stats/:container — container stats (one-shot) ──
@@ -124,7 +124,7 @@ router.get('/bruce/docker/stats/:container', async (req, res) => {
       net_rx_mb: stats.networks ? Math.round(Object.values(stats.networks).reduce((s, n) => s + (n.rx_bytes || 0), 0) / 1048576) : 0,
       net_tx_mb: stats.networks ? Math.round(Object.values(stats.networks).reduce((s, n) => s + (n.tx_bytes || 0), 0) / 1048576) : 0,
     });
-  } catch (e) { res.status(e.statusCode === 404 ? 404 : 500).json({ ok: false, error: e.message }); }
+  } catch (e) { console.error(`[docker.js] operation failed:`, e.message); res.status(e.statusCode === 404 ? 404 : 500).json({ ok: false, error: e.message }); }
 });
 
 // ── POST /bruce/docker/restart/:container — restart container ──
@@ -146,7 +146,7 @@ router.post('/bruce/docker/restart/:container', async (req, res) => {
     const ms = Date.now() - t0;
     auditLog('/bruce/docker/restart', req.headers['x-session-id'], 'local', `restart ${req.params.container}`, 'ok', ms);
     res.json({ ok: true, container: req.params.container, action: 'restart', duration_ms: ms });
-  } catch (e) {
+  } catch (e) { console.error(`[docker.js] operation failed:`, e.message);
     auditLog('/bruce/docker/restart', req.headers['x-session-id'], 'local', `restart ${req.params.container}`, 'error', Date.now() - t0);
     res.status(e.statusCode === 404 ? 404 : 500).json({ ok: false, error: e.message });
   }
@@ -170,7 +170,7 @@ router.post('/bruce/docker/stop/:container', async (req, res) => {
     const ms = Date.now() - t0;
     auditLog('/bruce/docker/stop', req.headers['x-session-id'], 'local', `stop ${req.params.container}`, 'ok', ms);
     res.json({ ok: true, container: req.params.container, action: 'stop', duration_ms: ms });
-  } catch (e) {
+  } catch (e) { console.error(`[docker.js] operation failed:`, e.message);
     auditLog('/bruce/docker/stop', req.headers['x-session-id'], 'local', `stop ${req.params.container}`, 'error', Date.now() - t0);
     res.status(e.statusCode === 404 ? 404 : 500).json({ ok: false, error: e.message });
   }
@@ -194,7 +194,7 @@ router.post('/bruce/docker/start/:container', async (req, res) => {
     const ms = Date.now() - t0;
     auditLog('/bruce/docker/start', req.headers['x-session-id'], 'local', `start ${req.params.container}`, 'ok', ms);
     res.json({ ok: true, container: req.params.container, action: 'start', duration_ms: ms });
-  } catch (e) {
+  } catch (e) { console.error(`[docker.js] operation failed:`, e.message);
     auditLog('/bruce/docker/start', req.headers['x-session-id'], 'local', `start ${req.params.container}`, 'error', Date.now() - t0);
     res.status(e.statusCode === 404 ? 404 : 500).json({ ok: false, error: e.message });
   }
@@ -230,7 +230,7 @@ router.get('/bruce/docker/health', async (req, res) => {
       }
     }
     res.json({ ok: true, ...summary, issues });
-  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+  } catch (e) { console.error(`[docker.js] operation failed:`, e.message); res.status(500).json({ ok: false, error: e.message }); }
 });
 
 module.exports = router;

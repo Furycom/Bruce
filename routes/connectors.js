@@ -18,7 +18,7 @@ router.get('/connectors', async (req, res) => {
   try {
     const raw = fs.readFileSync(CONNECTORS_PATH, 'utf8');
     connectors = JSON.parse(raw);
-  } catch (err) {
+  } catch (err) { console.error(`[connectors.js] operation failed:`, err.message);
     return res.status(500).json({
       error: 'Failed to read connectors.json',
       details: err.message || String(err),

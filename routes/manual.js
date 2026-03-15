@@ -22,7 +22,7 @@ router.get('/manual/pages', (req, res) => {
       files,
       timestamp: new Date().toISOString(),
     });
-  } catch (err) {
+  } catch (err) { console.error(`[manual.js] operation failed:`, err.message);
     res.status(500).json({
       error: 'Failed to list manual pages',
       details: err.message || String(err),
@@ -48,7 +48,7 @@ router.get('/manual/page', (req, res) => {
   let fullPath;
   try {
     fullPath = safeJoinManual(relPath);
-  } catch (err) {
+  } catch (err) { console.error(`[manual.js] operation failed:`, err.message);
     return res.status(400).json({
       error: err.message || String(err),
     });
@@ -62,7 +62,7 @@ router.get('/manual/page', (req, res) => {
       length: content.length,
       content,
     });
-  } catch (err) {
+  } catch (err) { console.error(`[manual.js] operation failed:`, err.message);
     if (err.code === 'ENOENT') {
       return res.status(404).json({
         error: 'Manual page not found',
@@ -100,7 +100,7 @@ router.get('/manual/search', (req, res) => {
     try {
       const fullPath = safeJoinManual(relPath);
       content = fs.readFileSync(fullPath, 'utf8');
-    } catch {
+    } catch (error) { console.error(`[manual.js] operation failed:`, error.message);
       continue;
     }
 

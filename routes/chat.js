@@ -105,7 +105,7 @@ router.get("/bruce/config/llm", (req, res) => {
       res.status(r.status);
       res.setHeader("Content-Type", r.headers.get("content-type") || "application/json; charset=utf-8");
       return res.send(text);
-    } catch (e) {
+    } catch (e) { console.error(`[chat.js] operation failed:`, e.message);
       return res.status(502).json({ ok: false, error: String(e && e.message ? e.message : e) });
     }
   });
@@ -148,7 +148,7 @@ router.get("/bruce/config/llm", (req, res) => {
       res.status(r.status);
       res.setHeader("Content-Type", r.headers.get("content-type") || "application/json; charset=utf-8");
       return res.send(text);
-    } catch (e) {
+    } catch (e) { console.error(`[chat.js] operation failed:`, e.message);
       return res.status(502).json({ ok: false, error: String(e && e.message ? e.message : e) });
     }
   });
@@ -315,7 +315,7 @@ router.get("/bruce/config/llm", (req, res) => {
           },
         ],
       });
-    } catch (err) {
+    } catch (err) { console.error(`[chat.js] operation failed:`, err.message);
       const emsg = err && err.message ? String(err.message) : 'LLM call failed';
       return res.status(502).json({
         error: { message: emsg.slice(0, 800), type: 'server_error' },
@@ -423,7 +423,7 @@ router.post('/bruce/llm/generate', async (req, res) => {
         }
 
       }
-    } catch (e) {
+    } catch (e) { console.error(`[chat.js] operation failed:`, e.message);
       body.rag_error = String(e && e.message ? e.message : e);
     }
   }
@@ -463,7 +463,7 @@ router.post('/bruce/llm/generate', async (req, res) => {
       message: msg,
       timestamp: utcNowIso(),
     });
-  } catch (err) {
+  } catch (err) { console.error(`[chat.js] operation failed:`, err.message);
     const emsg = err && err.message ? String(err.message) : 'LLM call failed';
     return res.status(502).json({ ok: false, error: emsg.slice(0, 800), timestamp: utcNowIso() });
   }
@@ -587,7 +587,7 @@ router.post('/chat', async (req, res) => {
       conversation_id: conversationId,
       reply,
     });
-  } catch (err) {
+  } catch (err) { console.error(`[chat.js] operation failed:`, err.message);
     await logFallback({
       kind: 'bruce_chat_exception',
       timestamp: utcNowIso(),
@@ -612,7 +612,7 @@ const SYSTEM_PROMPT_PATH = "/home/furycom/bruce-config/system_prompt.txt";
 let SYSTEM_PROMPT = "";
 try {
   SYSTEM_PROMPT = fs.readFileSync(SYSTEM_PROMPT_PATH, "utf8");
-} catch (e) {
+} catch (e) { console.error(`[chat.js] operation failed:`, e.message);
   // Ne pas throw ici pour ne pas tuer le serveur au boot; l'endpoint renverra une erreur claire.
   SYSTEM_PROMPT = "";
 }
@@ -626,10 +626,10 @@ try {
   // chemin absolu pour éviter les problèmes de résolution de modules dans /app
   // (docker-compose monte /home/furycom/mcp-stack -> /workspace)
   ({ NodeSSH } = require("/workspace/mcp-gateway/node_modules/node-ssh"));
-} catch (e1) {
+} catch (e1) { console.error(`[chat.js] operation failed:`, e1.message);
   try {
     ({ NodeSSH } = require("node-ssh"));
-  } catch (e2) {
+  } catch (e2) { console.error(`[chat.js] operation failed:`, e2.message);
     NodeSSH = null;
   }
 }
@@ -664,7 +664,7 @@ async function sshExecViaNodeSsh(host, command, timeoutMs) {
           privateKey,
           readyTimeout: timeoutMs
         });
-      } catch (e) {
+      } catch (e) { console.error(`[chat.js] operation failed:`, e.message);
         await ssh.connect({
           host: String(host),
           username: SSH_USER,
@@ -818,7 +818,7 @@ async function executeTool(toolName, params) {
       if (!safeParams.command) return { success: false, error: "Missing params.command" };
       try {
         return await sshExecViaNodeSsh(host, safeParams.command, timeoutMs);
-      } catch (e) {
+      } catch (e) { console.error(`[chat.js] operation failed:`, e.message);
         return { success: false, error: String(e && e.message ? e.message : e) };
       }
     }
@@ -831,7 +831,7 @@ async function executeTool(toolName, params) {
           "docker ps -a --format '{{.Names}}|{{.Status}}|{{.Ports}}'",
           20000
         );
-      } catch (e) {
+      } catch (e) { console.error(`[chat.js] operation failed:`, e.message);
         return { success: false, error: String(e && e.message ? e.message : e) };
       }
     }
@@ -853,7 +853,7 @@ async function executeTool(toolName, params) {
         const stmt = db.prepare(q);
         const rows = stmt.all();
         return { output: JSON.stringify(rows, null, 2) };
-      } catch (err) {
+      } catch (err) { console.error(`[chat.js] operation failed:`, err.message);
         return { error: String(err && err.message ? err.message : err) };
       } finally {
         try { db.close(); } catch (e) { console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', e.message || e); }
@@ -907,7 +907,7 @@ async function executeTool(toolName, params) {
         } else {
           return { success: false, error: "File write failed verification" };
         }
-      } catch (error) {
+      } catch (error) { console.error(`[chat.js] operation failed:`, error.message);
         return { success: false, error: "Write failed: " + (error.message || String(error)) };
       }
     }
@@ -959,7 +959,7 @@ async function executeTool(toolName, params) {
           };
         }
         
-      } catch (error) {
+      } catch (error) { console.error(`[chat.js] operation failed:`, error.message);
         try {
           await sshExecViaNodeSsh(host, "rm '" + tempScript + "' 2>/dev/null || true", 5000);
         } catch (e) { console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', e.message || e); }
@@ -1050,7 +1050,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
         tools_used: [{ name: "query_homelab_db", arguments: { query: sql } }]
       });
     }
-  } catch (err) {
+  } catch (err) { console.error(`[chat.js] operation failed:`, err.message);
     console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', err.message || err);
   }
 
@@ -1212,7 +1212,7 @@ router.post("/bruce/agent/chat", async (req, res) => {
       tools_used: []
     });
 
-  } catch (error) {
+  } catch (error) { console.error(`[chat.js] operation failed:`, error.message);
     return res.status(500).json({
       success: false,
       error: String(error && error.message ? error.message : error)

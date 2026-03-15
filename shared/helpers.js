@@ -47,7 +47,7 @@ function appendLineToFile(pathToFile, text) {
         console.error('Failed to append to fallback log:', err.message || err);
       }
     });
-  } catch (err) {
+  } catch (err) { console.error(`[helpers.js] operation failed:`, err.message);
     console.error('Fallback log write error:', err.message || err);
   }
 }
@@ -111,7 +111,7 @@ function listMarkdownFiles(baseDir) {
     let entries = [];
     try {
       entries = fs.readdirSync(currentDir, { withFileTypes: true });
-    } catch (err) {
+    } catch (err) { console.error(`[helpers.js] operation failed:`, err.message);
       return;
     }
 
@@ -165,7 +165,7 @@ async function pingUrl(url) {
       httpStatus: response.status,
       error: null,
     };
-  } catch (err) {
+  } catch (err) { console.error(`[helpers.js] operation failed:`, err.message);
     return {
       status: 'offline',
       httpStatus: null,
