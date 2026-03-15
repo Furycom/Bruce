@@ -4,7 +4,13 @@ const { SUPABASE_URL, SUPABASE_KEY } = require('./config');
 const { bruceClampInt } = require('./helpers');
 const { fetchWithTimeout } = require('./fetch-utils');
 
+/**
+ * Resolves the effective client IP from forwarding headers or socket metadata.
+ * @param {import('express').Request} req - Request object containing network metadata.
+ * @returns {string} Best-effort client IP string for identity detection.
+ */
 function bruceClientIp(req) {
+
   const xf = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
   return xf || String(req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : "unknown");
 }
@@ -59,7 +65,13 @@ const LLM_PROFILES_FALLBACK = {
 let _profileCache = { data: null, ts: 0 };
 const PROFILE_CACHE_TTL = 5 * 60 * 1000;
 
+/**
+ * Detects which LLM profile should be used for the current request.
+ * @param {import('express').Request} req - Request containing optional identity headers and source metadata.
+ * @returns {string} Profile identity key such as `claude`, `chatgpt`, or `local-llm`.
+ */
 function detectLLMIdentity(req) {
+
   const explicit = (req.headers['x-llm-identity'] || '').trim().toLowerCase();
   if (explicit && (LLM_PROFILES_FALLBACK[explicit] || explicit === 'claude' || explicit === 'chatgpt' || explicit === 'local-llm')) {
     return explicit;
@@ -73,7 +85,13 @@ function detectLLMIdentity(req) {
   return 'claude';
 }
 
+/**
+ * Loads a profile definition from Supabase with fallback to local defaults.
+ * @param {string} identity - Profile identity key to resolve.
+ * @returns {Promise<Record<string, any>>} Profile configuration object for prompt/context shaping.
+ */
 async function loadLLMProfile(identity) {
+
   const now = Date.now();
   if (_profileCache.data && (now - _profileCache.ts) < PROFILE_CACHE_TTL) {
     const cached = _profileCache.data[identity];
@@ -98,7 +116,18 @@ async function loadLLMProfile(identity) {
   return LLM_PROFILES_FALLBACK[identity] || LLM_PROFILES_FALLBACK['claude'];
 }
 
+/**
+ * Builds the formatted context block tailored to a selected LLM profile.
+ * @param {Record<string, any>} profile - Active LLM profile configuration.
+ * @param {Record<string, any>|null} dashboard - Dashboard summary metrics.
+ * @param {Array<Record<string, any>>} tasks - Pending roadmap tasks.
+ * @param {Array<Record<string, any>>} lessons - Critical lessons learned entries.
+ * @param {Array<Record<string, any>>} ragResults - Semantic retrieval results.
+ * @param {Array<Record<string, any>>} currentState - Current state rows used to enrich context.
+ * @returns {string} Context text ready to be injected into prompts.
+ */
 function buildContextForProfile(profile, dashboard, tasks, lessons, ragResults, currentState) {
+
   const parts = [];
   const format = profile.context_format || 'markdown_structured';
   const isClaude = profile.profile_name === 'claude';

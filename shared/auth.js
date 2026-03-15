@@ -8,6 +8,11 @@ let _tokenCacheAt = 0;
 const TOKEN_CACHE_TTL_MS = 5 * 60 * 1000;
 let _loadingPromise = null;
 
+/**
+ * Computes a stable SHA-256 hash for an API token value.
+ * @param {string} raw - Plain token string received from the caller.
+ * @returns {string} Hex-encoded hash used for token matching and rate limiting.
+ */
 function hashToken(raw) {
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
