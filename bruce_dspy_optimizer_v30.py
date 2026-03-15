@@ -44,10 +44,7 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 log = logging.getLogger("dspy_v29")
 
@@ -72,8 +69,11 @@ def save_progress(phase, step, total, score=None, extra=None):
     }
     if extra:
         data.update(extra)
-    with open(PROGRESS_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+    try:
+        with open(PROGRESS_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        log.warning(f"Impossible d'écrire le fichier de progression ({PROGRESS_FILE}): {e}")
 
 
 # ─── Signature ────────────────────────────────────────────────────────────────
@@ -1300,168 +1300,194 @@ def save_optimized_program(program, score, phase):
         log.warning(f"Impossible de sauvegarder le programme: {e}")
 
 
+def _handle_sigterm(signum, frame):
+    log.warning("SIGTERM reçu: arrêt propre en cours (cleanup lockfile)...")
+    raise SystemExit(143)
+
+
+def _handle_timeout(signum, frame):
+    log.error("GLOBAL TIMEOUT after 14h")
+    raise SystemExit(124)
+
+
 def main():
     # ─── Lockfile ───────────────────────────────────────────────────────────
     lock_fh = acquire_lock()
-    log.info("=" * 70)
-    log.info("BRUCE DSPy Optimizer v2.9 — Démarrage")
-    log.info(f"PID: {os.getpid()}")
-    log.info(f"LLM: {LLM_BASE_URL} model={MODEL_NAME}")
-    log.info(f"TRAIN={len(TRAIN_SET)} DEV={len(DEV_SET)} TEST={len(TEST_SET)}")
-    log.info("=" * 70)
-
-    save_progress("startup", 0, 0)
-
-    # ─── Vérification slot ──────────────────────────────────────────────────
-    if not check_llm_slot():
-        log.error("Slot llama-server occupé. Lancer 'docker restart llama-server' sur .32 puis relancer.")
-        sys.exit(1)
-
-    # ─── Warm-up ────────────────────────────────────────────────────────────
-    if not warm_up_llm():
-        log.error("LLM non accessible. Vérifier llama-server sur .32:8000.")
-        sys.exit(1)
-
-    # ─── Configure DSPy ─────────────────────────────────────────────────────
-    log.info(f"Configuration DSPy: model={MODEL_NAME} timeout={TIMEOUT_SEC}s max_tokens={MAX_TOKENS}")
-    lm = dspy.LM(
-        model=MODEL_NAME,
-        api_base=LLM_BASE_URL,
-        api_key=LLM_API_KEY,
-        max_tokens=MAX_TOKENS,
-        timeout=TIMEOUT_SEC,
-    )
-    dspy.configure(lm=lm)
-
-    # ─── Phase 1: BASELINE sur DEV ──────────────────────────────────────────
-    log.info("")
-    log.info("─" * 70)
-    log.info("PHASE 1: BASELINE (non-optimisé) sur DEV set")
-    log.info(f"  {len(DEV_SET)} exemples × ~300s/ex ≈ {len(DEV_SET)*300//60} minutes estimées")
-    log.info("─" * 70)
-
-    baseline_module = BruceExtractorV29()
-    save_progress("baseline", 0, len(DEV_SET))
-
-    t_baseline_start = time.time()
-    baseline_score, baseline_scores = manual_evaluate(
-        baseline_module, DEV_SET, extraction_quality_metric, label="BASELINE"
-    )
-    t_baseline = time.time() - t_baseline_start
-
-    log.info(f"✅ BASELINE terminé: score={baseline_score:.3f} en {t_baseline/60:.1f}min")
-    save_progress("baseline_done", len(DEV_SET), len(DEV_SET), score=baseline_score,
-                  extra={"time_min": round(t_baseline/60, 1), "scores": baseline_scores})
-
-    with open(f"{RESULTS_DIR}/baseline_results.json", "w") as f:
-        json.dump({
-            "phase": "baseline",
-            "score": baseline_score,
-            "scores": baseline_scores,
-            "time_min": round(t_baseline/60, 1),
-            "n_examples": len(DEV_SET)
-        }, f, indent=2)
-
-    # ─── Phase 2: MIPROv2 sur TRAIN ─────────────────────────────────────────
-    log.info("")
-    log.info("─" * 70)
-    log.info("PHASE 2: MIPROv2 heavy optimization sur TRAIN set")
-    log.info(f"  {len(TRAIN_SET)} exemples train / {len(DEV_SET)} exemples val")
-    log.info("  Durée estimée: 4-8 heures")
-    log.info("─" * 70)
-    save_progress("mipro_start", 0, len(TRAIN_SET))
-
-    optimizer = dspy.MIPROv2(
-        metric=extraction_quality_metric,
-        auto="heavy",
-        verbose=True,
-        num_threads=1,       # Single thread — slot unique llama-server
-    )
-
-    t_mipro_start = time.time()
+    previous_sigterm_handler = signal.getsignal(signal.SIGTERM)
+    previous_sigalrm_handler = signal.getsignal(signal.SIGALRM)
+    signal.signal(signal.SIGTERM, _handle_sigterm)
+    signal.signal(signal.SIGALRM, _handle_timeout)
     try:
-        optimized_program = optimizer.compile(
-            BruceExtractorV29(),
-            trainset=TRAIN_SET,
-            valset=DEV_SET,
-            # num_trials=40,  # REMOVED: conflicts with auto=heavy (DSPy 3.x)
-            minibatch=False,
-            requires_permission_to_run=False,
+        signal.alarm(50400)  # 14h max runtime watchdog for unattended runs
+
+        log.info("=" * 70)
+        log.info("BRUCE DSPy Optimizer v2.9 — Démarrage")
+        log.info(f"PID: {os.getpid()}")
+        log.info(f"LLM: {LLM_BASE_URL} model={MODEL_NAME}")
+        log.info(f"TRAIN={len(TRAIN_SET)} DEV={len(DEV_SET)} TEST={len(TEST_SET)}")
+        log.info("=" * 70)
+
+        save_progress("startup", 0, 0)
+
+        # ─── Vérification slot ──────────────────────────────────────────────
+        if not check_llm_slot():
+            log.error("Slot llama-server occupé. Lancer 'docker restart llama-server' sur .32 puis relancer.")
+            sys.exit(1)
+
+        # ─── Warm-up ────────────────────────────────────────────────────────
+        if not warm_up_llm():
+            log.error("LLM non accessible. Vérifier llama-server sur .32:8000.")
+            sys.exit(1)
+
+        # ─── Configure DSPy ─────────────────────────────────────────────────
+        log.info(f"Configuration DSPy: model={MODEL_NAME} timeout={TIMEOUT_SEC}s max_tokens={MAX_TOKENS}")
+        lm = dspy.LM(
+            model=MODEL_NAME,
+            api_base=LLM_BASE_URL,
+            api_key=LLM_API_KEY,
+            max_tokens=MAX_TOKENS,
+            timeout=TIMEOUT_SEC,
         )
-        t_mipro = time.time() - t_mipro_start
-        log.info(f"✅ MIPROv2 terminé en {t_mipro/3600:.1f}h")
-        save_progress("mipro_done", len(TRAIN_SET), len(TRAIN_SET),
-                      extra={"time_h": round(t_mipro/3600, 2)})
+        dspy.configure(lm=lm)
+
+        # ─── Phase 1: BASELINE sur DEV ──────────────────────────────────────
+        log.info("")
+        log.info("─" * 70)
+        log.info("PHASE 1: BASELINE (non-optimisé) sur DEV set")
+        log.info(f"  {len(DEV_SET)} exemples × ~300s/ex ≈ {len(DEV_SET)*300//60} minutes estimées")
+        log.info("─" * 70)
+
+        baseline_module = BruceExtractorV29()
+        save_progress("baseline", 0, len(DEV_SET))
+
+        t_baseline_start = time.time()
+        baseline_score, baseline_scores = manual_evaluate(
+            baseline_module, DEV_SET, extraction_quality_metric, label="BASELINE"
+        )
+        t_baseline = time.time() - t_baseline_start
+
+        log.info(f"✅ BASELINE terminé: score={baseline_score:.3f} en {t_baseline/60:.1f}min")
+        save_progress("baseline_done", len(DEV_SET), len(DEV_SET), score=baseline_score,
+                      extra={"time_min": round(t_baseline/60, 1), "scores": baseline_scores})
+
+        with open(f"{RESULTS_DIR}/baseline_results.json", "w") as f:
+            json.dump({
+                "phase": "baseline",
+                "score": baseline_score,
+                "scores": baseline_scores,
+                "time_min": round(t_baseline/60, 1),
+                "n_examples": len(DEV_SET)
+            }, f, indent=2)
+
+        # ─── Phase 2: MIPROv2 sur TRAIN ─────────────────────────────────────
+        log.info("")
+        log.info("─" * 70)
+        log.info("PHASE 2: MIPROv2 heavy optimization sur TRAIN set")
+        log.info(f"  {len(TRAIN_SET)} exemples train / {len(DEV_SET)} exemples val")
+        log.info("  Durée estimée: 4-8 heures")
+        log.info("─" * 70)
+        save_progress("mipro_start", 0, len(TRAIN_SET))
+
+        optimizer = dspy.MIPROv2(
+            metric=extraction_quality_metric,
+            auto="heavy",
+            verbose=True,
+            num_threads=1,       # Single thread — slot unique llama-server
+        )
+
+        t_mipro_start = time.time()
+        try:
+            optimized_program = optimizer.compile(
+                BruceExtractorV29(),
+                trainset=TRAIN_SET,
+                valset=DEV_SET,
+                # num_trials=40,  # REMOVED: conflicts with auto=heavy (DSPy 3.x)
+                minibatch=False,
+                requires_permission_to_run=False,
+            )
+            t_mipro = time.time() - t_mipro_start
+            log.info(f"✅ MIPROv2 terminé en {t_mipro/3600:.1f}h")
+            save_progress("mipro_done", len(TRAIN_SET), len(TRAIN_SET),
+                          extra={"time_h": round(t_mipro/3600, 2)})
+        except Exception as e:
+            log.error(f"❌ MIPROv2 échoué: {e}")
+            log.info("Sauvegarde du programme baseline comme fallback...")
+            optimized_program = baseline_module
+            log.info("Continuing with baseline (non-optimized) for phases 3-4")
+            save_progress("mipro_failed", 0, 0, extra={"error": str(e)})
+
+        # ─── Phase 3: Évaluation post-MIPROv2 sur DEV ───────────────────────
+        log.info("")
+        log.info("─" * 70)
+        log.info("PHASE 3: Évaluation post-MIPROv2 sur DEV set")
+        log.info("─" * 70)
+        save_progress("eval_dev", 0, len(DEV_SET))
+
+        optimized_score_dev, optimized_scores_dev = manual_evaluate(
+            optimized_program, DEV_SET, extraction_quality_metric, label="POST-MIPRO-DEV"
+        )
+        log.info(f"✅ Post-MIPROv2 DEV: {baseline_score:.3f} → {optimized_score_dev:.3f} "
+                 f"(Δ={optimized_score_dev - baseline_score:+.3f})")
+
+        # ─── Phase 4: Évaluation finale sur TEST (jamais vu) ────────────────
+        log.info("")
+        log.info("─" * 70)
+        log.info("PHASE 4: Évaluation finale sur TEST set (jamais vu pendant optimization)")
+        log.info("─" * 70)
+        save_progress("eval_test", 0, len(TEST_SET))
+
+        final_score_test, final_scores_test = manual_evaluate(
+            optimized_program, TEST_SET, extraction_quality_metric, label="FINAL-TEST"
+        )
+        log.info(f"✅ Score final TEST: {final_score_test:.3f}")
+
+        # ─── Résumé ─────────────────────────────────────────────────────────
+        log.info("")
+        log.info("=" * 70)
+        log.info("RÉSULTATS FINAUX DSPy v2.9")
+        log.info("=" * 70)
+        log.info(f"  Baseline DEV:     {baseline_score:.3f}")
+        log.info(f"  Post-MIPROv2 DEV: {optimized_score_dev:.3f}  (Δ={optimized_score_dev-baseline_score:+.3f})")
+        log.info(f"  Final TEST:       {final_score_test:.3f}  (référence honnête, jamais vu)")
+        log.info("")
+
+        # Sauvegarder résultats
+        results = {
+            "version": "v2.9",
+            "baseline_dev": baseline_score,
+            "optimized_dev": optimized_score_dev,
+            "delta_dev": round(optimized_score_dev - baseline_score, 3),
+            "final_test": final_score_test,
+            "n_train": len(TRAIN_SET),
+            "n_dev": len(DEV_SET),
+            "n_test": len(TEST_SET),
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
+        with open(f"{RESULTS_DIR}/final_results_v29.json", "w") as f:
+            json.dump(results, f, indent=2)
+
+        save_progress("done", 0, 0, score=final_score_test, extra=results)
+        log.info(f"Résultats sauvegardés dans {RESULTS_DIR}/final_results_v29.json")
+        log.info("=" * 70)
+
+        # Sauvegarder le programme optimisé
+        save_optimized_program(optimized_program, final_score_test, "final")
+
+        log.info("✅ DSPy v2.9 terminé avec succès.")
+        return results
+    except SystemExit:
+        raise
     except Exception as e:
-        log.error(f"❌ MIPROv2 échoué: {e}")
-        log.info("Sauvegarde du programme baseline comme fallback...")
-        optimized_program = baseline_module
-        save_progress("mipro_failed", 0, 0, extra={"error": str(e)})
-
-    # ─── Phase 3: Évaluation post-MIPROv2 sur DEV ───────────────────────────
-    log.info("")
-    log.info("─" * 70)
-    log.info("PHASE 3: Évaluation post-MIPROv2 sur DEV set")
-    log.info("─" * 70)
-    save_progress("eval_dev", 0, len(DEV_SET))
-
-    optimized_score_dev, optimized_scores_dev = manual_evaluate(
-        optimized_program, DEV_SET, extraction_quality_metric, label="POST-MIPRO-DEV"
-    )
-    log.info(f"✅ Post-MIPROv2 DEV: {baseline_score:.3f} → {optimized_score_dev:.3f} "
-             f"(Δ={optimized_score_dev - baseline_score:+.3f})")
-
-    # ─── Phase 4: Évaluation finale sur TEST (jamais vu) ────────────────────
-    log.info("")
-    log.info("─" * 70)
-    log.info("PHASE 4: Évaluation finale sur TEST set (jamais vu pendant optimization)")
-    log.info("─" * 70)
-    save_progress("eval_test", 0, len(TEST_SET))
-
-    final_score_test, final_scores_test = manual_evaluate(
-        optimized_program, TEST_SET, extraction_quality_metric, label="FINAL-TEST"
-    )
-    log.info(f"✅ Score final TEST: {final_score_test:.3f}")
-
-    # ─── Résumé ─────────────────────────────────────────────────────────────
-    log.info("")
-    log.info("=" * 70)
-    log.info("RÉSULTATS FINAUX DSPy v2.9")
-    log.info("=" * 70)
-    log.info(f"  Baseline DEV:     {baseline_score:.3f}")
-    log.info(f"  Post-MIPROv2 DEV: {optimized_score_dev:.3f}  (Δ={optimized_score_dev-baseline_score:+.3f})")
-    log.info(f"  Final TEST:       {final_score_test:.3f}  (référence honnête, jamais vu)")
-    log.info("")
-
-    # Sauvegarder résultats
-    results = {
-        "version": "v2.9",
-        "baseline_dev": baseline_score,
-        "optimized_dev": optimized_score_dev,
-        "delta_dev": round(optimized_score_dev - baseline_score, 3),
-        "final_test": final_score_test,
-        "n_train": len(TRAIN_SET),
-        "n_dev": len(DEV_SET),
-        "n_test": len(TEST_SET),
-        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
-    }
-    with open(f"{RESULTS_DIR}/final_results_v29.json", "w") as f:
-        json.dump(results, f, indent=2)
-
-    save_progress("done", 0, 0, score=final_score_test, extra=results)
-    log.info(f"Résultats sauvegardés dans {RESULTS_DIR}/final_results_v29.json")
-    log.info("=" * 70)
-
-    # Sauvegarder le programme optimisé
-    save_optimized_program(optimized_program, final_score_test, "final")
-
-    # Nettoyer lockfile
-    lock_fh.close()
-    if os.path.exists(LOCK_FILE):
-        os.unlink(LOCK_FILE)
-
-    log.info("✅ DSPy v2.9 terminé avec succès.")
-    return results
+        log.error(f"❌ Erreur fatale non gérée: {e}", exc_info=True)
+        save_progress("fatal_error", 0, 0, extra={"error": str(e)})
+        raise
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous_sigalrm_handler)
+        signal.signal(signal.SIGTERM, previous_sigterm_handler)
+        lock_fh.close()
+        if os.path.exists(LOCK_FILE):
+            os.unlink(LOCK_FILE)
 
 
 if __name__ == "__main__":
