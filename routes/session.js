@@ -20,9 +20,9 @@ const { buildContextForClaude } = require('../shared/context-engine');
 // Dependency injection for safePythonSpawn (defined in server.js)
 let _safePythonSpawn = null;
 /**
- * setSafePythonSpawn internal helper.
- * @param {any} fn - Function input parameter.
- * @returns {any} Helper return value used by route handlers.
+ * Injects the safe Python spawn implementation used by session endpoints.
+ * @param {(args: string[]) => Promise<{ok: boolean, code: number, stdout: string, stderr: string}>} fn - Safe spawn function provided by the server bootstrap.
+ * @returns {void} No return value.
  */
 function setSafePythonSpawn(fn) { _safePythonSpawn = fn; }
 

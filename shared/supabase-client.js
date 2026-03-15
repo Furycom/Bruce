@@ -2,7 +2,15 @@
 const { SUPABASE_URL, SUPABASE_KEY } = require('./config');
 const { utcNowIso, logFallback, isSupabaseConfigured } = require('./helpers');
 
+/**
+ * Writes a memory event row to Supabase (currently short-circuited while table is disabled).
+ * @param {string} source - Origin system that emitted the event.
+ * @param {string} eventType - Event classification label.
+ * @param {Record<string, any>} payload - Structured event payload.
+ * @returns {Promise<string|null>} Inserted event ID when available, otherwise `null`.
+ */
 async function insertMemoryEvent(source, eventType, payload) {
+
   // DISABLED: table memory_events inexistante/vidée, voir [840].
   return null;
   if (!isSupabaseConfigured()) {
@@ -80,7 +88,16 @@ async function insertMemoryEvent(source, eventType, payload) {
   return null;
 }
 
+/**
+ * Writes a conversation message linked to a memory event (currently short-circuited).
+ * @param {string|null} eventId - Parent memory event ID for the message row.
+ * @param {string} conversationId - Conversation identifier associated with the message.
+ * @param {string} role - Message author role (`user`, `assistant`, etc.).
+ * @param {string} content - Message text content to persist.
+ * @returns {Promise<void>} Resolves when logging attempts complete.
+ */
 async function insertConversationMessage(eventId, conversationId, role, content) {
+
   // DISABLED: table conversation_messages inexistante/vidée, voir [840].
   return;
   if (!isSupabaseConfigured() || !eventId) {

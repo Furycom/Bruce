@@ -469,10 +469,10 @@ router.post("/bruce/rag/context", async (req, res) => {
 
 // --- bruceRagContext helper (used by chat.js and session/init) ---
 /**
- * bruceRagContext internal helper.
- * @param {any} qtext - Function input parameters.
- * @param {any} k - Additional function input parameter.
- * @returns {any} Helper return value used by route handlers.
+ * Builds a RAG context string by embedding a query and retrieving matching chunks.
+ * @param {string} qtext - User query text used to fetch relevant knowledge snippets.
+ * @param {number} k - Maximum number of chunks to include in the context payload.
+ * @returns {Promise<{ q: string, k: number, results: any[], context: string }>} Search results plus the assembled context string.
  */
 async function bruceRagContext(qtext, k) {
   const q = String(qtext || "").trim();
