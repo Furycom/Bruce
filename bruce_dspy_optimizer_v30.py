@@ -23,6 +23,7 @@ import time
 import fcntl
 import signal
 import logging
+import glob
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 LLM_BASE_URL  = "http://192.168.2.32:8000/v1"
@@ -32,10 +33,10 @@ MAX_TOKENS    = 2000
 TIMEOUT_SEC   = 600
 CTX_SIZE      = 16384
 
-RESULTS_DIR   = "/home/furycom/dspy_results_v29"
-LOG_FILE      = f"{RESULTS_DIR}/bench_v29.log"
-PROGRESS_FILE = "/tmp/dspy_v29_progress.json"
-LOCK_FILE     = "/tmp/dspy_v29.lock"
+RESULTS_DIR   = "/home/furycom/dspy_results_v30"
+LOG_FILE      = f"{RESULTS_DIR}/bench_v30.log"
+PROGRESS_FILE = "/tmp/dspy_v30_progress.json"
+LOCK_FILE     = "/tmp/dspy_v30.lock"
 BEST_MODEL    = f"{RESULTS_DIR}/best_model.json"
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
@@ -46,7 +47,22 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
-log = logging.getLogger("dspy_v29")
+log = logging.getLogger("dspy_v30")
+
+
+def _validate_constants():
+    """Vérifie la cohérence des constantes de version au démarrage."""
+    script_name = os.path.basename(__file__)  # bruce_dspy_optimizer_v30.py
+    version_in_name = ''.join(filter(str.isdigit, script_name.split('_optimizer_')[1].split('.')[0]))  # "30"
+    lock_version = ''.join(filter(str.isdigit, os.path.basename(LOCK_FILE).replace('.lock', '')))  # "30"
+    if version_in_name and lock_version and version_in_name != lock_version:
+        raise RuntimeError(
+            f"INCOHÉRENCE DE VERSION DÉTECTÉE:\n"
+            f"  Script: {script_name} (version {version_in_name})\n"
+            f"  LOCK_FILE: {LOCK_FILE} (version {lock_version})\n"
+            f"Corriger les constantes LOCK_FILE, PROGRESS_FILE, RESULTS_DIR, LOG_FILE."
+        )
+    log.info(f"✓ Constantes validées: version={version_in_name}, lockfile={LOCK_FILE}")
 
 # ─── Lockfile anti-doublon ─────────────────────────────────────────────────────
 def acquire_lock():
@@ -57,7 +73,19 @@ def acquire_lock():
         lf.flush()
         return lf
     except IOError:
-        log.error(f"Un autre process DSPy tourne déjà (lockfile {LOCK_FILE}). Abort.")
+        pid_in_lock = open(LOCK_FILE).read().strip() if os.path.exists(LOCK_FILE) else "inconnu"
+        if pid_in_lock.isdigit() and not os.path.exists(f"/proc/{pid_in_lock}"):
+            log.warning(f"Lockfile orphelin détecté (PID {pid_in_lock} n'existe plus). Suppression automatique.")
+            os.unlink(LOCK_FILE)
+            # Retenter l'acquisition
+            try:
+                fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                lf.write(str(os.getpid()))
+                lf.flush()
+                return lf
+            except IOError:
+                pass
+        log.error(f"Un autre process DSPy tourne déjà (PID={pid_in_lock}, lockfile={LOCK_FILE}). Abort.")
         sys.exit(1)
 
 # ─── Progress JSON ─────────────────────────────────────────────────────────────
@@ -1259,6 +1287,13 @@ def check_llm_slot():
                 log.warning("Vérifier avec: curl http://192.168.2.32:8000/slots")
                 log.warning("Fix si bloqué: docker restart llama-server sur .32")
                 return False
+
+            # Nettoyer les lockfiles résiduels d'anciennes versions
+            for old_lock in glob.glob('/tmp/dspy_v*.lock'):
+                if old_lock != LOCK_FILE:
+                    log.warning(f"Lockfile résiduel supprimé: {old_lock}")
+                    os.unlink(old_lock)
+
             log.info(f"✅ Slot llama-server libre ({len(slots)} slot(s))")
             return True
     except Exception as e:
@@ -1311,6 +1346,8 @@ def _handle_timeout(signum, frame):
 
 
 def main():
+    _validate_constants()
+
     # ─── Lockfile ───────────────────────────────────────────────────────────
     lock_fh = acquire_lock()
     previous_sigterm_handler = signal.getsignal(signal.SIGTERM)
