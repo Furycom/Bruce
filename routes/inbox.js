@@ -33,7 +33,7 @@ router.get('/bruce/inbox/check', async (req, res) => {
         return { name: f, size: stat.size, mtime: stat.mtime.toISOString() };
       });
     return res.json({ ok: true, count: files.length, files, inbox_dir: INBOX_DIR });
-  } catch (e) {
+  } catch (e) { console.error(`[inbox.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message) });
   }
 });
@@ -59,7 +59,7 @@ router.post('/bruce/inbox/ingest', async (req, res) => {
     });
     const data = await resp.json();
     return res.status(resp.status).json(data);
-  } catch (e) {
+  } catch (e) { console.error(`[inbox.js] operation failed:`, e.message);
     return res.status(502).json({ ok: false, error: 'inbox runner unreachable: ' + String(e.message), hint: 'Verify tmux inboxrun on .230 port 4002' });
   }
 });
@@ -85,7 +85,7 @@ router.get('/bruce/archive/check', async (req, res) => {
     const files = fs.readdirSync(ARCHIVE_DIR)
       .filter(f => !f.startsWith('.') && (f.endsWith('.txt') || f.endsWith('.md') || f.endsWith('.log')));
     return res.json({ ok: true, count: files.length, files, archive_dir: ARCHIVE_DIR });
-  } catch (e) {
+  } catch (e) { console.error(`[inbox.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message) });
   }
 });
@@ -144,7 +144,7 @@ router.post('/bruce/archive/ingest', async (req, res) => {
 
     const success = results.filter(r => r.ok).length;
     return res.json({ ok: true, ingested: success, total: files.length, files, results });
-  } catch (e) {
+  } catch (e) { console.error(`[inbox.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message) });
   }
 });

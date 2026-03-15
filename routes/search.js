@@ -32,7 +32,7 @@ router.post('/', requireScope('read'), async (req, res) => {
       signal: AbortSignal.timeout(8000),
     });
     if (!embedRes.ok) {
-      const detail = await embedRes.text().catch(() => '');
+      const detail = await embedRes.text().catch((error) => (console.error(`[search.js] operation failed:`, error.message), ''));
       return res.status(502).json({ ok: false, error: 'Embedder error', detail });
     }
     const embedData = await embedRes.json();
@@ -48,7 +48,7 @@ router.post('/', requireScope('read'), async (req, res) => {
       return res.status(502).json({ ok: false, error: 'Embedder returned invalid embedding' });
     }
 
-    const qvec = `[${vec.join(',')}]`;
+    const qvec = `[{vec.join(',')}]`;
 
     // ── Step 2: Call pgvector hybrid search RPC ──
     const rpcUrl = `${SUPABASE_URL}/rpc/bruce_rag_hybrid_search_text`;
@@ -63,7 +63,7 @@ router.post('/', requireScope('read'), async (req, res) => {
       signal: AbortSignal.timeout(8000),
     });
     if (!rpcRes.ok) {
-      const detail = await rpcRes.text().catch(() => '');
+      const detail = await rpcRes.text().catch((error) => (console.error(`[search.js] operation failed:`, error.message), ''));
       return res.status(502).json({ ok: false, error: 'Supabase RPC error', detail });
     }
     const results = await rpcRes.json();
@@ -85,7 +85,7 @@ router.post('/', requireScope('read'), async (req, res) => {
         preview: (r.preview || '').slice(0, 500),
       })),
     });
-  } catch (err) {
+  } catch (err) { console.error(`[search.js] operation failed:`, err.message);
     if (err.name === 'TimeoutError' || err.name === 'AbortError') {
       return res.status(504).json({ ok: false, error: 'Search timeout' });
     }

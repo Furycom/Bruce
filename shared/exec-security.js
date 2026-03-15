@@ -93,7 +93,7 @@ function auditLog(endpoint, caller, host, cmd, result, durationMs) {
       'Authorization': 'Bearer ' + SUPABASE_KEY,
     },
     body: JSON.stringify(row),
-  }).catch(() => {}); // fire-and-forget
+  }).catch((error) => { console.error(`[exec-security.js] operation failed:`, error.message); }); // fire-and-forget
 }
 
 module.exports = { validateExecCommand, auditLog, WHITELIST, BLACKLIST };

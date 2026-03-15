@@ -65,7 +65,7 @@ router.post('/bruce/file/write', async (req, res) => {
       size: stats.size,
       mode: writeMode === 'a' ? 'append' : 'overwrite'
     });
-  } catch (e) {
+  } catch (e) { console.error(`[file.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 });
@@ -98,7 +98,7 @@ router.get('/bruce/file/read', async (req, res) => {
     const content = fs.readFileSync(resolved, 'utf8');
     const stats = fs.statSync(resolved);
     return res.json({ ok: true, filepath: resolved, size: stats.size, content });
-  } catch (e) {
+  } catch (e) { console.error(`[file.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 });

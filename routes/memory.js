@@ -84,7 +84,7 @@ router.post('/bruce/memory/append', async (req, res) => {
     let parsed = null;
     try {
       parsed = text ? JSON.parse(text) : null;
-    } catch (e) {
+    } catch (e) { console.error(`[memory.js] operation failed:`, e.message);
       return res.status(500).json({ ok: false, error: 'JSON parse error' });
     }
 
@@ -92,7 +92,7 @@ router.post('/bruce/memory/append', async (req, res) => {
 
     // TODO(contract-v2): migrate success payload to { ok: true, data } without breaking current consumers.
     return res.json({ ok: true, inserted, timestamp: new Date().toISOString() });
-  } catch (err) {
+  } catch (err) { console.error(`[memory.js] operation failed:`, err.message);
     return res.status(500).json({ ok: false, error: err && err.message ? err.message : String(err) });
   }
 });

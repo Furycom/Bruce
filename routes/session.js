@@ -72,7 +72,7 @@ router.post('/bruce/session/init', async (req, res) => {
 
     const rpcPayload = await rpcRes.json();
     const bruceToolsArr = await bruceToolsRes.json();
-    const clarifArr = await clarifRes.json().catch(() => []);
+    const clarifArr = await clarifRes.json().catch((error) => (console.error(`[session.js] operation failed:`, error.message), []));
 
     // [820] Extract from RPC result
     const currentState = rpcPayload.current_state || [];
@@ -104,7 +104,7 @@ router.post('/bruce/session/init', async (req, res) => {
       } else if (createData && createData.id) {
         newSessionId = createData.id;
       }
-    } catch (sessErr) {
+    } catch (sessErr) { console.error(`[session.js] operation failed:`, sessErr.message);
       console.error('[session.js][/bruce/session/init] erreur silencieuse:', sessErr.message || sessErr);
     }
 
@@ -147,7 +147,7 @@ router.post('/bruce/session/init', async (req, res) => {
         );
         const ragData = await ragRes.json();
         return Array.isArray(ragData) ? ragData : [];
-      } catch { return []; }
+      } catch (error) { console.error(`[session.js] operation failed:`, error.message); return []; }
     };
 
     try {
@@ -172,7 +172,7 @@ router.post('/bruce/session/init', async (req, res) => {
           score: Math.round(r.score * 100) / 100,
           preview: (r.preview || '').slice(0, 200)
         }));
-    } catch (ragErr) {
+    } catch (ragErr) { console.error(`[session.js] operation failed:`, ragErr.message);
       console.error('[session.js][/bruce/session/init] erreur silencieuse:', ragErr.message || ragErr);
     }
 
@@ -190,7 +190,7 @@ router.post('/bruce/session/init', async (req, res) => {
           topicWords ? fetchWithTimeout(
             base + '/lessons_learned?validated=eq.true&lesson_text=fts.' + encodeURIComponent(topicWords) + '&order=importance.desc,id.desc&limit=8',
             { headers: hSupa }, 5000
-          ).then(r => r.json()).catch(() => []) : Promise.resolve([]),
+          ).then(r => r.json()).catch((error) => (console.error(`[session.js] operation failed:`, error.message), [])) : Promise.resolve([]),
 
           // [B] Semantique: bruceRagContext sur le topic -> anchors lessons_learned
           bruceRagContext(topic, 12).then(ragCtx => {
@@ -202,7 +202,7 @@ router.post('/bruce/session/init', async (req, res) => {
               }
             }
             return lessonIds;
-          }).catch(() => [])
+          }).catch((error) => (console.error(`[session.js] operation failed:`, error.message), []))
         ]);
 
         const ftsLessons = (ftsResult.status === 'fulfilled' && Array.isArray(ftsResult.value)) ? ftsResult.value : [];
@@ -261,7 +261,7 @@ router.post('/bruce/session/init', async (req, res) => {
           const lessonLimit = (rpcProfile === 'light') ? 3 : (rpcProfile === 'minimal') ? 1 : 10; // [772] C6
           routedLessons = [...canonicalLock, ...fusedFiltered, ...recentFiltered].slice(0, lessonLimit);
         }
-      } catch (routerErr) {
+      } catch (routerErr) { console.error(`[session.js] operation failed:`, routerErr.message);
         // Context router v2 optionnel - fallback sur criticalLessons originales
         routedLessons = Array.isArray(criticalLessons) ? criticalLessons : [];
       }
@@ -294,7 +294,7 @@ router.post('/bruce/session/init', async (req, res) => {
     let llmOk = false;
 
     const nextTask = roadmap.length > 0
-      ? `[${roadmap[0].id}] ${roadmap[0].step_name} (priorité ${roadmap[0].priority})`
+      ? `[{roadmap[0].id}] ${roadmap[0].step_name} (priorité ${roadmap[0].priority})`
       : 'aucune tâche en cours';
 
     const lastSessionSummary = lastSession
@@ -302,7 +302,7 @@ router.post('/bruce/session/init', async (req, res) => {
       : 'Pas de session précédente trouvée.';
 
     const ragContext = ragResults.length > 0
-      ? ragResults.map((r, i) => `[${i+1}] (score ${r.score}) ${r.preview}`).join('\n')
+      ? ragResults.map((r, i) => `[{i+1}] (score ${r.score}) ${r.preview}`).join('\n')
       : 'Aucun resultat RAG pour ce topic.';
 
     // Extraire les règles Yann et leçons critiques pour le prompt
@@ -360,7 +360,7 @@ Sois direct, precis, actionnable.`;
       const llmData = await llmRes.json();
       llmSummary = llmData?.choices?.[0]?.message?.content || null;
       llmOk = !!llmSummary;
-    } catch (llmErr) {
+    } catch (llmErr) { console.error(`[session.js] operation failed:`, llmErr.message);
       llmSummary = null; // dégradé gracieux
     }
 
@@ -464,7 +464,7 @@ Sois direct, precis, actionnable.`;
       } : undefined,
     });
 
-  } catch (e) {
+  } catch (e) { console.error(`[session.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 });
@@ -511,7 +511,7 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
       );
       const data = await r.json();
       sessionInfo = Array.isArray(data) && data[0] ? data[0] : null;
-    } catch (e) {
+    } catch (e) { console.error(`[session.js] operation failed:`, e.message);
       console.error('[session.js][/bruce/session/close/checklist] erreur silencieuse:', e.message || e);
     }
 
@@ -576,7 +576,7 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
           warnings.push('[876] WARNING: handoff_vivant non mis Ã  jour depuis ' + Math.round(ageMinutes) + ' min. La sauvegarde de session est-elle complÃ¨te?');
         }
       }
-    } catch (e) { warnings.push('[876] Could not verify handoff_vivant: ' + e.message); }
+    } catch (e) { console.error(`[session.js] operation failed:`, e.message); warnings.push('[876] Could not verify handoff_vivant: ' + e.message); }
 
     // [876] VÃ©rification git status sur .230
     try {
@@ -693,7 +693,7 @@ router.get('/bruce/session/close/checklist', async (req, res) => {
       instructions: 'Remplir les 7 catégories ci-dessus puis POST /bruce/session/close avec le JSON complet. Les catégories vides génèrent des warnings mais seuls summary, tasks_status et handoff_next sont obligatoires.'
     });
 
-  } catch (e) {
+  } catch (e) { console.error(`[session.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 });
@@ -886,7 +886,7 @@ router.post('/bruce/session/close', async (req, res) => {
           5000
         );
         taskResults.push({ id: task.id, status: task.status, ok: r.ok });
-      } catch (e) {
+      } catch (e) { console.error(`[session.js] operation failed:`, e.message);
         taskResults.push({ id: task.id, status: task.status, ok: false, error: e.message });
       }
     }
@@ -914,7 +914,7 @@ router.post('/bruce/session/close', async (req, res) => {
           5000
         );
         taskResults.push({ id: task.id, status: 'done', ok: r.ok, via: 'tasks_done_shortcut' });
-      } catch (e) {
+      } catch (e) { console.error(`[session.js] operation failed:`, e.message);
         taskResults.push({ id: task.id, status: 'done', ok: false, error: e.message, via: 'tasks_done_shortcut' });
       }
     }
@@ -990,7 +990,7 @@ router.post('/bruce/session/close', async (req, res) => {
         );
         warnings.push('session_history créée automatiquement pour session ' + sessionId);
       }
-    } catch (e) {
+    } catch (e) { console.error(`[session.js] operation failed:`, e.message);
       warnings.push('Echec check/create session_history: ' + e.message);
     }
 
@@ -1008,7 +1008,7 @@ router.post('/bruce/session/close', async (req, res) => {
         { method: 'PATCH', headers: hSupa, body: JSON.stringify(sessionPatch) },
         5000
       );
-    } catch (e) {
+    } catch (e) { console.error(`[session.js] operation failed:`, e.message);
       warnings.push('Echec mise a jour session_history: ' + e.message);
     }
 
@@ -1024,7 +1024,7 @@ router.post('/bruce/session/close', async (req, res) => {
           },
           5000
         );
-      } catch (e) {
+      } catch (e) { console.error(`[session.js] operation failed:`, e.message);
         warnings.push('Echec mise a jour handoff_vivant: ' + e.message);
       }
     }
@@ -1040,7 +1040,7 @@ router.post('/bruce/session/close', async (req, res) => {
           65000
         );
         validateResult = await valRes.json();
-      } catch (e) {
+      } catch (e) { console.error(`[session.js] operation failed:`, e.message);
         warnings.push('validate.py call failed: ' + e.message + ' - items restent en staging pending.');
       }
     }
@@ -1064,7 +1064,7 @@ router.post('/bruce/session/close', async (req, res) => {
         },
         5000
       );
-    } catch (e) {
+    } catch (e) { console.error(`[session.js] operation failed:`, e.message);
       warnings.push('Echec mise a jour CURRENT_STATE: ' + e.message);
     }
 
@@ -1100,7 +1100,7 @@ router.post('/bruce/session/close', async (req, res) => {
         : `✅ Toutes les categories couvertes. ${totalExtracted} items extraits.`
     });
 
-  } catch (e) {
+  } catch (e) { console.error(`[session.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 });

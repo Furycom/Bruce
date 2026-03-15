@@ -131,7 +131,7 @@ router.post('/bruce/chatgpt', async (req, res) => {
         'Si une tâche nécessite Claude Code, dis-le clairement'
       ]
     });
-  } catch (e) {
+  } catch (e) { console.error(`[chatgpt.js] operation failed:`, e.message);
     console.error('[/bruce/chatgpt] Error:', e.message);
     return res.status(500).json({
       ok: false,

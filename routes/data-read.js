@@ -51,7 +51,7 @@ router.post("/bruce/read", async (req, res) => {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     // TODO(contract-v2): wrap read result into { ok: true, data } after consumer migration.
     return res.send(text);
-  } catch (e) {
+  } catch (e) { console.error(`[data-read.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e && e.message ? e.message : e) });
   }
 });
@@ -77,7 +77,7 @@ router.get('/bruce/roadmap/list', async (req, res) => {
       elapsed_ms: Date.now() - startMs,
       tasks
     });
-  } catch (err) {
+  } catch (err) { console.error(`[data-read.js] operation failed:`, err.message);
     console.error('[/bruce/roadmap/list]', err.message);
     return res.status(500).json({ ok: false, error: err.message, elapsed_ms: Date.now() - startMs });
   }

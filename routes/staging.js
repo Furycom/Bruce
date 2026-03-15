@@ -29,7 +29,7 @@ router.post('/bruce/staging/validate', async (req, res) => {
     }
     // TODO(contract-v2): migrate success payload to { ok: true, data } without breaking current consumers.
     return res.json(data);
-  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+  } catch (e) { console.error(`[staging.js] operation failed:`, e.message); res.status(500).json({ ok: false, error: e.message }); }
 });
 
 // GET /bruce/staging/status — etat staging_queue
@@ -53,7 +53,7 @@ router.get('/bruce/staging/status', async (req, res) => {
     for (const row of rows) counts[row.status] = (counts[row.status] || 0) + 1;
     // TODO(contract-v2): migrate success payload to { ok: true, data } without breaking current consumers.
     res.json({ ok: true, total: rows.length, counts });
-  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+  } catch (e) { console.error(`[staging.js] operation failed:`, e.message); res.status(500).json({ ok: false, error: e.message }); }
 });
 
 module.exports = router;

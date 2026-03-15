@@ -162,7 +162,7 @@ router.post("/bruce/rag/search", async (req, res) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inputs: q, max_length: 256 }),
       }, BRUCE_RAG_EMBED_TIMEOUT_MS);
-    } catch (e) {
+    } catch (e) { console.error(`[rag.js] operation failed:`, e.message);
       const ms = Date.now() - t0;
       bruceRagMetricErr("search", ms, "embedder timeout/error: " + String(e && e.message ? e.message : e));
       return res.status(504).json({ ok: false, error: "Embedder timeout/error" });
@@ -176,7 +176,7 @@ router.post("/bruce/rag/search", async (req, res) => {
     }
 
     let ej;
-    try { ej = JSON.parse(et); } catch (_) { ej = null; }
+    try { ej = JSON.parse(et); } catch (_) { console.error(`[rag.js] operation failed:`, _.message); ej = null; }
     if (!Array.isArray(ej) || !Array.isArray(ej[0])) {
       const ms = Date.now() - t0;
       bruceRagMetricErr("search", ms, "embedder format");
@@ -223,7 +223,7 @@ router.post("/bruce/rag/search", async (req, res) => {
           },
           body: JSON.stringify({ qtext: q, qvec, k }),
         }, BRUCE_RAG_SUPABASE_TIMEOUT_MS);
-      } catch (e) {
+      } catch (e) { console.error(`[rag.js] operation failed:`, e.message);
         r = null
         lastText = null
         break
@@ -245,7 +245,7 @@ router.post("/bruce/rag/search", async (req, res) => {
 
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     return res.send(lastText || "[]");
-  } catch (e) {
+  } catch (e) { console.error(`[rag.js] operation failed:`, e.message);
     const ms = Date.now() - t0;
     bruceRagMetricErr("search", ms, String(e && e.message ? e.message : e));
     return res.status(500).json({ ok: false, error: String(e && e.message ? e.message : e) });
@@ -284,7 +284,7 @@ router.post("/bruce/tool-check", async (req, res) => {
 
     if (!er.ok) return res.status(502).json({ ok: false, error: "Embedder error" });
     const et = await er.text();
-    let ej; try { ej = JSON.parse(et); } catch(_) { ej = null; }
+    let ej; try { ej = JSON.parse(et); } catch(_) { console.error(`[rag.js] operation failed:`, _.message); ej = null; }
     if (!Array.isArray(ej) || !Array.isArray(ej[0])) return res.status(502).json({ ok: false, error: "Embedder format error" });
 
     const vec = ej[0].map(x => Number(x));
@@ -332,7 +332,7 @@ router.post("/bruce/tool-check", async (req, res) => {
       count: tools.length,
       threshold_hint: 0.6,
     });
-  } catch (e) {
+  } catch (e) { console.error(`[rag.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e && e.message ? e.message : e) });
   }
 });
@@ -379,7 +379,7 @@ router.post("/bruce/rag/context", async (req, res) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inputs: q, max_length: 256 })
       }, BRUCE_RAG_EMBED_TIMEOUT_MS);
-    } catch (e) {
+    } catch (e) { console.error(`[rag.js] operation failed:`, e.message);
       const ms = Date.now() - t0;
       bruceRagMetricErr("context", ms, "embedder timeout/error: " + String(e && e.message ? e.message : e));
       return res.status(504).json({ ok: false, error: "Embedder timeout/error" });
@@ -433,7 +433,7 @@ router.post("/bruce/rag/context", async (req, res) => {
           },
           body: JSON.stringify({ qtext: q, qvec: qvec, k: k })
         }, BRUCE_RAG_SUPABASE_TIMEOUT_MS);
-      } catch (e) {
+      } catch (e) { console.error(`[rag.js] operation failed:`, e.message);
         rr = null
         rtxt = null
         break
@@ -460,7 +460,7 @@ router.post("/bruce/rag/context", async (req, res) => {
     bruceRagMetricOk("context", ms);
 
     return res.json({ ok: true, q: q, k: k, results: results, context: context });
-  } catch (e) {
+  } catch (e) { console.error(`[rag.js] operation failed:`, e.message);
     const ms = Date.now() - t0;
     bruceRagMetricErr("context", ms, String(e && e.message ? e.message : e));
     return res.status(500).json({ ok: false, error: String(e && e.message ? e.message : e) });
@@ -577,7 +577,7 @@ router.post('/tools/rag/search', async (req, res) => {
     if (!rpcResp.ok) return res.status(502).json({ ok: false, error: 'RPC error ' + rpcResp.status });
     const results = await rpcResp.json();
     res.json({ ok: true, query, count: results.length, results });
-  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+  } catch (e) { console.error(`[rag.js] operation failed:`, e.message); res.status(500).json({ ok: false, error: e.message }); }
 });
 
 // POST /bruce/preflight
@@ -738,7 +738,7 @@ router.post('/bruce/preflight', async (req, res) => {
           if (semanticLessons.length >= 3) break;
         }
       }
-    } catch(ragErr) {
+    } catch(ragErr) { console.error(`[rag.js] operation failed:`, ragErr.message);
       // Degrade gracieux: si embedder down, continue avec FTS seul
       semanticLessons = [];
     }
@@ -790,7 +790,7 @@ router.post('/bruce/preflight', async (req, res) => {
       reminder: '⚠️ RAPPEL: Appliquer ces règles AVANT d\'agir. En cas de doute, écrire un script .sh.'
     });
 
-  } catch (e) {
+  } catch (e) { console.error(`[rag.js] operation failed:`, e.message);
     // Fallback: retourner au moins les quick_rules
     return res.json({
       ok: true,

@@ -51,7 +51,7 @@ router.post('/bruce/exec', async (req, res) => {
       output: (output || '').substring(0, 50000),
       duration_ms: ms,
     });
-  } catch (e) {
+  } catch (e) { console.error(`[exec.js] operation failed:`, e.message);
     const ms = Date.now() - t0;
     auditLog('/bruce/exec', req.headers['x-session-id'], 'local', cmd, 'error', ms);
     // TODO(contract-v2): migrate error payload to { ok: false, error, data } without breaking current consumers.

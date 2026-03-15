@@ -50,11 +50,11 @@ router.post('/bruce/roadmap/done', async (req, res) => {
     );
 
     if (!r.ok) {
-      const errText = await r.text().catch(() => 'unknown');
+      const errText = await r.text().catch((error) => (console.error(`[roadmap.js] operation failed:`, error.message), 'unknown'));
       return res.status(r.status || 500).json({ ok: false, error: 'Supabase PATCH failed: ' + errText });
     }
 
-    const data = await r.json().catch(() => []);
+    const data = await r.json().catch((error) => (console.error(`[roadmap.js] operation failed:`, error.message), []));
     if (!data || data.length === 0) {
       return res.status(404).json({ ok: false, error: 'Task id=' + id + ' not found in roadmap.' });
     }
@@ -63,7 +63,7 @@ router.post('/bruce/roadmap/done', async (req, res) => {
       ok: true,
       task: { id: data[0].id, step_name: data[0].step_name, status: data[0].status, evidence: data[0].evidence }
     });
-  } catch (e) {
+  } catch (e) { console.error(`[roadmap.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: e.message });
   }
 });

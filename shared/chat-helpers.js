@@ -16,7 +16,7 @@ function parseLegacyToolCallFromContent(content) {
     const name = obj && obj.name ? String(obj.name) : null;
     const args = obj && obj.arguments && typeof obj.arguments === 'object' ? obj.arguments : {};
     return name ? { name, arguments: args } : null;
-  } catch (e) {
+  } catch (e) { console.error(`[chat-helpers.js] operation failed:`, e.message);
     console.error('[chat.js][/bruce/agent/chat] erreur silencieuse:', e.message || e);
     return null;
   }
@@ -38,7 +38,7 @@ function extractSshCredsFromPrompt(promptText) {
 function safeJsonParse(value, fallbackValue) {
   try {
     return JSON.parse(value);
-  } catch (_) {
+  } catch (_) { console.error(`[chat-helpers.js] operation failed:`, _.message);
     return fallbackValue;
   }
 }
