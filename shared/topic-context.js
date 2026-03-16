@@ -54,11 +54,14 @@ const TOPIC_SYNONYMS = {
  */
 function normalizeTopic(raw) {
   const key = String(raw || '').toLowerCase().trim().split(/[\s,]+/)[0] || '';
+  if (!key) return 'general';
   if (TOPIC_MAPPING[key]) return key;
   if (TOPIC_SYNONYMS[key]) return TOPIC_SYNONYMS[key];
-  // Fuzzy: check if topic is a substring of any key or vice versa
-  for (const k of Object.keys(TOPIC_MAPPING)) {
-    if (key.includes(k) || k.includes(key)) return k;
+  // Fuzzy: check if topic is a substring of any key or vice versa (min 3 chars to avoid false matches)
+  if (key.length >= 3) {
+    for (const k of Object.keys(TOPIC_MAPPING)) {
+      if (key.includes(k) || k.includes(key)) return k;
+    }
   }
   return key || 'general';
 }
@@ -96,7 +99,7 @@ async function loadTopicContext(topic, supabaseUrl, supabaseKey) {
       }
     }
 
-    // ── 2. Load KB entries: rules (anti-patterns + governance) ──
+    // ── 2. Load KB entries: rules + runbooks by tags ──
     if (mapping && mapping.kb_tags && mapping.kb_tags.length > 0) {
       const tagFilter = mapping.kb_tags.map((t) => encodeURIComponent(t)).join(',');
       const kbResp = await fetchWithTimeout(
@@ -108,8 +111,7 @@ async function loadTopicContext(topic, supabaseUrl, supabaseKey) {
         const entries = await kbResp.json();
         for (const e of entries) {
           const isRule = e.subcategory === 'anti-patterns' || e.category === 'governance';
-          const isRunbook = e.category === 'runbook' || e.category === 'ssh';
-          const target = isRule ? result.rules : isRunbook ? result.runbooks : result.runbooks;
+          const target = isRule ? result.rules : result.runbooks;
           target.push({
             source: `KB#${e.id}`,
             category: e.category,
