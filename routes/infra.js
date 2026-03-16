@@ -23,6 +23,8 @@ const {
   PULSE_URL,
   LOOPBACK_BASE_URL,
   LOCAL_LLM_URL,
+  BRUCE_SSH_KEY_PATH,
+  BRUCE_SSH_HOSTS,
 } = require('../shared/config');
 const { pingUrl } = require('../shared/helpers');
 const { fetchWithTimeout } = require('../shared/fetch-utils');
@@ -760,19 +762,6 @@ router.get('/bruce/process/status', async (req, res) => {
 
 // ── POST /bruce/ssh/exec — Execute whitelisted commands on remote machines ──
 
-// Allowed SSH hosts (IP -> user mapping)
-const SSH_HOSTS = {
-  '192.168.2.32': { user: 'furycom', label: 'dell-7910' },
-  '192.168.2.146': { user: 'furycom', label: 'furysupa' },
-  '192.168.2.154': { user: 'yann', label: 'box2-observability' },
-  '192.168.2.174': { user: 'yann', label: 'box2-n8n' },
-  '192.168.2.85': { user: 'furycom', label: 'embedder' },
-  '192.168.2.231': { user: 'furycom', label: 'furycom-231' },
-  '192.168.2.230': { user: 'furycom', label: 'gateway-host' },
-};
-
-const SSH_KEY_PATH = '/home/node/.ssh/id_ed25519';
-
 router.post('/bruce/ssh/exec', async (req, res) => {
   const auth = validateBruceAuth(req, 'exec');
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
@@ -784,12 +773,12 @@ router.post('/bruce/ssh/exec', async (req, res) => {
   }
 
   // Validate host
-  const hostEntry = SSH_HOSTS[host];
+  const hostEntry = BRUCE_SSH_HOSTS[host];
   if (!hostEntry) {
     return res.status(403).json({
       ok: false,
       error: `Host not allowed: ${host}`,
-      allowed_hosts: Object.keys(SSH_HOSTS),
+      allowed_hosts: Object.keys(BRUCE_SSH_HOSTS),
     });
   }
 
@@ -808,7 +797,7 @@ router.post('/bruce/ssh/exec', async (req, res) => {
     await ssh.connect({
       host,
       username: hostEntry.user,
-      privateKey: SSH_KEY_PATH,
+      privateKey: BRUCE_SSH_KEY_PATH,
       readyTimeout: 8000,
       keepaliveInterval: 5000,
     });
