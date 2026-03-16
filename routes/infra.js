@@ -591,5 +591,76 @@ router.get('/bruce/llm/status', async (req, res) => {
 });
 
 
+/**
+ * GET /bruce/process/status?name=X — Check if a process is running
+ * Optional: ?host=local (default, runs on gateway container)
+ * Returns: {ok, running, pids[], command_sample, count}
+ */
+router.get('/bruce/process/status', async (req, res) => {
+  const auth = validateBruceAuth(req);
+  if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
+
+  const name = req.query.name;
+  if (!name || typeof name !== 'string') {
+    return res.status(400).json({ ok: false, error: 'query param "name" required (process name or pattern)' });
+  }
+
+  const host = req.query.host || 'local';
+  if (host !== 'local') {
+    return res.status(400).json({ ok: false, error: 'Only host=local is supported' });
+  }
+
+  // Sanitize: only allow alphanumeric, dash, underscore, dot
+  const sanitized = name.replace(/[^a-zA-Z0-9._-]/g, '');
+  if (!sanitized) {
+    return res.status(400).json({ ok: false, error: 'Invalid process name after sanitization' });
+  }
+
+  try {
+    const { spawnSync } = require('child_process');
+    const proc = spawnSync('pgrep', ['-a', '-f', sanitized], {
+      timeout: 5000,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    // pgrep returns exit code 1 if no match — that's not an error
+    if (proc.status === 1) {
+      return res.json({ ok: true, data: { running: false, pids: [], processes: [], count: 0, name: sanitized, host } });
+    }
+
+    if (proc.error) throw proc.error;
+    if (proc.status !== 0) {
+      throw new Error((proc.stderr || proc.stdout || 'pgrep failed').trim());
+    }
+
+    const lines = String(proc.stdout || '').trim().split('\n').filter(Boolean);
+    const processes = lines.map((line) => {
+      const parts = line.split(/\s+/);
+      const pid = parseInt(parts[0], 10);
+      return {
+        pid,
+        command: parts.slice(1).join(' ').substring(0, 200),
+      };
+    }).filter((entry) => Number.isInteger(entry.pid) && entry.pid > 0);
+
+    return res.json({
+      ok: true,
+      data: {
+        running: processes.length > 0,
+        pids: processes.map((entry) => entry.pid),
+        processes,
+        count: processes.length,
+        name: sanitized,
+        host,
+      }
+    });
+  } catch (e) {
+    console.error('[infra.js][/bruce/process/status] Error:', e.message);
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+
 module.exports = router;
 module.exports.setSafePythonSpawn = setSafePythonSpawn;
