@@ -19,6 +19,7 @@ const MCP_PLAYWRIGHT_URL =
   process.env.MCP_PLAYWRIGHT_URL || 'http://192.168.2.174:5678';
 const LOCAL_LLM_URL = process.env.LOCAL_LLM_URL || 'http://192.168.2.32:8000';
 const VLLM_INTERNAL_URL = process.env.VLLM_INTERNAL_URL || 'http://172.18.0.1:4100';
+const PULSE_URL = process.env.PULSE_URL || 'http://192.168.2.154:7655';
 const LOOPBACK_BASE_URL = process.env.LOOPBACK_BASE_URL || 'http://127.0.0.1';
 const GATEWAY_PUBLIC_URL =
   process.env.GATEWAY_PUBLIC_URL || 'http://192.168.2.230:4000';
@@ -66,6 +67,7 @@ module.exports = {
   MCP_PLAYWRIGHT_URL,
   LOCAL_LLM_URL,
   VLLM_INTERNAL_URL,
+  PULSE_URL,
   LOOPBACK_BASE_URL,
   GATEWAY_PUBLIC_URL,
   SUPABASE_REST_FALLBACK_URL,

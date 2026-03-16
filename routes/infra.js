@@ -20,6 +20,7 @@ const {
   VALIDATE_SERVICE_URL,
   MCP_PLAYWRIGHT_URL,
   VLLM_INTERNAL_URL,
+  PULSE_URL,
   LOOPBACK_BASE_URL,
   LOCAL_LLM_URL,
 } = require('../shared/config');
@@ -588,6 +589,98 @@ router.get('/bruce/llm/status', async (req, res) => {
 
   result.elapsed_ms = Date.now() - startMs;
   res.json(result);
+});
+
+// ── GET /bruce/health/full — Aggregated service health (cached 30s) ──
+let _healthCache = null;
+let _healthCacheAt = 0;
+let _healthInflight = null;
+const HEALTH_CACHE_TTL_MS = 30000;
+
+const _trimUrl = (value) => (value ? String(value).replace(/\/+$/, '') : null);
+
+async function runFullHealthChecks() {
+  const now = Date.now();
+  const PULSE_AUTH = 'Basic ' + Buffer.from('admin:bruce-pulse-2026').toString('base64');
+  const supaHeaders = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+  const pulseBase = _trimUrl(PULSE_URL);
+
+  const checks = [
+    { name: 'supabase', url: _trimUrl(SUPABASE_URL), headers: supaHeaders },
+    { name: 'local-llm', url: _trimUrl(LOCAL_LLM_URL) ? _trimUrl(LOCAL_LLM_URL) + '/health' : null },
+    { name: 'embedder', url: _trimUrl(EMBEDDER_URL) ? _trimUrl(EMBEDDER_URL) + '/health' : null },
+    { name: 'n8n', url: _trimUrl(MCP_PLAYWRIGHT_URL) ? _trimUrl(MCP_PLAYWRIGHT_URL) + '/healthz' : null },
+    { name: 'validate-svc', url: _trimUrl(VALIDATE_SERVICE_URL) ? _trimUrl(VALIDATE_SERVICE_URL) + '/health' : null },
+    { name: 'litellm', url: _trimUrl(VLLM_INTERNAL_URL) ? _trimUrl(VLLM_INTERNAL_URL) + '/' : null },
+    { name: 'pulse', url: pulseBase ? pulseBase + '/api/resources' : null, headers: { 'Authorization': PULSE_AUTH } },
+  ];
+
+  const TIMEOUT_PER_CHECK = 5000;
+  const results = await Promise.allSettled(
+    checks.map(async (check) => {
+      if (!check.url) return { name: check.name, status: 'not_configured', latency_ms: 0 };
+      const t0 = Date.now();
+      try {
+        const resp = await fetchWithTimeout(check.url, { headers: check.headers || {} }, TIMEOUT_PER_CHECK);
+        return {
+          name: check.name,
+          status: resp.status < 500 ? 'ok' : 'error',
+          http_status: resp.status,
+          latency_ms: Date.now() - t0,
+        };
+      } catch (e) {
+        console.error('[infra.js][/bruce/health/full] check failed:', check.name, e.message || e);
+        return {
+          name: check.name,
+          status: 'down',
+          latency_ms: Date.now() - t0,
+          error: (e.message || String(e)).substring(0, 100),
+        };
+      }
+    })
+  );
+
+  const services = results.map((r) => r.status === 'fulfilled' ? r.value : { name: '?', status: 'error', error: 'check_failed' });
+  const allOk = services.every((s) => s.status === 'ok');
+
+  const payload = {
+    ok: allOk,
+    services,
+    healthy: services.filter((s) => s.status === 'ok').length,
+    total: services.length,
+    timestamp: new Date().toISOString(),
+    cached: false,
+  };
+
+  _healthCache = payload;
+  _healthCacheAt = now;
+  return payload;
+}
+
+router.get('/bruce/health/full', async (req, res) => {
+  const auth = validateBruceAuth(req);
+  if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
+
+  const now = Date.now();
+
+  // Return cached result if fresh
+  if (_healthCache && (now - _healthCacheAt) < HEALTH_CACHE_TTL_MS) {
+    return res.json({ ..._healthCache, cached: true, cache_age_ms: now - _healthCacheAt });
+  }
+
+  try {
+    if (!_healthInflight) {
+      _healthInflight = runFullHealthChecks().finally(() => {
+        _healthInflight = null;
+      });
+    }
+
+    const payload = await _healthInflight;
+    return res.json(payload);
+  } catch (e) {
+    console.error('[infra.js][/bruce/health/full] operation failed:', e.message || e);
+    return res.status(500).json({ ok: false, error: String(e.message || e).substring(0, 100) });
+  }
 });
 
 
