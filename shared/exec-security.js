@@ -3,12 +3,30 @@ const { SUPABASE_URL, SUPABASE_KEY } = require('./config');
 
 // ── Whitelist: patterns autorisés (regex) ──
 const WHITELIST = [
+  // Docker (read-only)
   /^docker\s+(ps|logs|inspect|stats|images|top|port|diff)\b/,
   /^docker\s+compose\s+(ps|logs|config)\b/,
-  /^(cat|head|tail|wc|ls|df|free|uptime|hostname|whoami)\b/,
+  // Filesystem read (cat, head, tail, wc, ls, find, stat, du, file)
+  /^(cat|head|tail|wc|ls|find|stat|du|file)\b/,
+  // System info (df, free, uptime, hostname, whoami, uname, lsb_release, id, date)
+  /^(df|free|uptime|hostname|whoami|uname|lsb_release|id|date)\b/,
+  // Process inspection (pgrep, ps, top -bn1, pidof)
+  /^(pgrep|pidof)\b/,
+  /^ps\s+(aux|ef|--no-headers)\b/,
+  /^top\s+-bn1\b/,
+  // Service status (read-only systemctl)
+  /^systemctl\s+(status|is-active|is-enabled|list-units|show)\b/,
+  /^journalctl\s/,
+  // Network read (ip, ss, netstat)
+  /^(ip\s+(a|addr|r|route|link)|ss\s|netstat\s)/,
+  // Curl (safe fetches)
   /^curl\s+-s\b/,
+  // User scripts
   /^\/home\/furycom\/scripts\//,
   /^\.\/bruce_/,
+  // Grep/awk/sed read-only (no -i for sed)
+  /^(grep|egrep|awk)\b/,
+  /^sed\s+(-n\s+)?['"]?[0-9]/,  // sed with line numbers only, not sed -i
 ];
 
 // ── Blacklist: patterns interdits (regex) ──
@@ -20,11 +38,14 @@ const BLACKLIST = [
   /chmod\s+777\b/,
   /shutdown|reboot|poweroff|init\s+[06]/,
   /&&/,                            // chaînage interdit
-  /\|.*\|/,                        // double pipe interdit
+  /\|.*\|/,                        // double pipe interdit (single pipe OK)
   /;\s*rm\b/,                      // injection via ;
   /`/,                             // backtick injection
   /\$\(/,                          // command substitution
   /\\"/,                           // guillemets imbriqués
+  /sed\s+-i\b/,                    // in-place edit forbidden
+  />\s/,                           // output redirect forbidden
+  />>/,                            // append redirect forbidden
 ];
 
 /**

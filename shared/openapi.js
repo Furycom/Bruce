@@ -60,6 +60,37 @@ const BRUCE_OPENAPI_SPEC = {
           }
         }}
     },
+    "/bruce/process/status": {
+      get: {
+        operationId: "bruce_process_status",
+        summary: "Check if a process is running by name",
+        parameters: [
+          {
+            name: "name",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+            description: "Process name or pattern",
+          },
+          {
+            name: "host",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["local"], default: "local" },
+            description: "Execution scope (only local is supported)",
+          }
+        ],
+        responses: {
+          "200": {
+            description: "OK",
+            content: {
+              "application/json": {
+                schema: jsonObjectSchema
+              }
+            }
+          }
+        }}
+    },
     "/bruce/memory/append": {
       post: {
         operationId: "bruce_memory_append",
