@@ -1,0 +1,16 @@
+[Unit]
+Description=BRUCE Validate Service (HTTP port 4001)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/furycom
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/furycom/validate_service.py
+StandardOutput=append:/home/furycom/logs/validate_service.log
+StandardError=append:/home/furycom/logs/validate_service.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

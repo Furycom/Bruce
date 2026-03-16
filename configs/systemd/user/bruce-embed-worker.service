@@ -1,0 +1,16 @@
+[Unit]
+Description=BRUCE Embed Worker (continuous RAG embedding)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/furycom
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/furycom/venv-ingestion/bin/python3 /home/furycom/embed_worker.py
+StandardOutput=append:/home/furycom/logs/embed_worker.log
+StandardError=append:/home/furycom/logs/embed_worker.log
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

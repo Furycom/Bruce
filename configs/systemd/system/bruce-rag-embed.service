@@ -1,0 +1,11 @@
+[Unit]
+Description=BRUCE RAG embeddings daily backfill
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=furycom
+WorkingDirectory=/home/furycom/mcp-stack
+ExecStart=/home/furycom/mcp-stack/tools/rag/run_rag_embed_daily.sh

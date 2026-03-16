@@ -1,0 +1,11 @@
+[Unit]
+Description=Run BRUCE docker collector every 10 minutes
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=600
+AccuracySec=30
+Unit=bruce-docker-collector.service
+
+[Install]
+WantedBy=timers.target

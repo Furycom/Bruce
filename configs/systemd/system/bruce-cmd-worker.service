@@ -1,0 +1,17 @@
+[Unit]
+Description=BRUCE command worker (poll Supabase bruce_memory_journal for bruce_cmd)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=furycom
+WorkingDirectory=/home/furycom/mcp-stack
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/furycom/mcp-stack/bruce_cmd_worker_loop.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
