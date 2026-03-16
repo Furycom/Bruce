@@ -26,6 +26,8 @@ const {
 } = require('../shared/config');
 const { pingUrl } = require('../shared/helpers');
 const { fetchWithTimeout } = require('../shared/fetch-utils');
+const { NodeSSH } = require('node-ssh');
+const { validateExecCommand } = require('../shared/exec-security');
 
 // safePythonSpawn injected from server.js via module.exports function
 let _safePythonSpawn = null;
@@ -754,6 +756,97 @@ router.get('/bruce/process/status', async (req, res) => {
   }
 });
 
+
+
+// ── POST /bruce/ssh/exec — Execute whitelisted commands on remote machines ──
+
+// Allowed SSH hosts (IP -> user mapping)
+const SSH_HOSTS = {
+  '192.168.2.32': { user: 'furycom', label: 'dell-7910' },
+  '192.168.2.146': { user: 'furycom', label: 'furysupa' },
+  '192.168.2.154': { user: 'yann', label: 'box2-observability' },
+  '192.168.2.174': { user: 'yann', label: 'box2-n8n' },
+  '192.168.2.85': { user: 'furycom', label: 'embedder' },
+  '192.168.2.231': { user: 'furycom', label: 'furycom-231' },
+  '192.168.2.230': { user: 'furycom', label: 'gateway-host' },
+};
+
+const SSH_KEY_PATH = '/home/node/.ssh/id_ed25519';
+
+router.post('/bruce/ssh/exec', async (req, res) => {
+  const auth = validateBruceAuth(req, 'exec');
+  if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
+
+  const { host, command, timeout = 15000 } = req.body || {};
+
+  if (!host || !command) {
+    return res.status(400).json({ ok: false, error: 'host and command required' });
+  }
+
+  // Validate host
+  const hostEntry = SSH_HOSTS[host];
+  if (!hostEntry) {
+    return res.status(403).json({
+      ok: false,
+      error: `Host not allowed: ${host}`,
+      allowed_hosts: Object.keys(SSH_HOSTS),
+    });
+  }
+
+  // Validate command using same whitelist as local exec
+  const cmd = String(command).trim();
+  const check = validateExecCommand(cmd);
+  if (!check.allowed) {
+    return res.status(403).json({ ok: false, error: 'Command refused', reason: check.reason });
+  }
+
+  const maxTimeout = Math.min(parseInt(timeout, 10) || 15000, 30000);
+  const t0 = Date.now();
+  const ssh = new NodeSSH();
+
+  try {
+    await ssh.connect({
+      host,
+      username: hostEntry.user,
+      privateKey: SSH_KEY_PATH,
+      readyTimeout: 8000,
+      keepaliveInterval: 5000,
+    });
+
+    const result = await ssh.execCommand(cmd, { execOptions: { timeout: maxTimeout } });
+    const elapsed = Date.now() - t0;
+
+    ssh.dispose();
+
+    return res.json({
+      ok: result.code === 0 || result.code === null,
+      host,
+      host_label: hostEntry.label,
+      user: hostEntry.user,
+      command: cmd,
+      stdout: (result.stdout || '').substring(0, 50000),
+      stderr: (result.stderr || '').substring(0, 10000),
+      exit_code: result.code,
+      elapsed_ms: elapsed,
+    });
+  } catch (e) {
+    const elapsed = Date.now() - t0;
+    try {
+      ssh.dispose();
+    } catch (disposeError) {
+      console.error('[infra.js][/bruce/ssh/exec] dispose failed:', disposeError.message || disposeError);
+    }
+    console.error('[infra.js][/bruce/ssh/exec] operation failed:', e.message || e);
+    return res.status(500).json({
+      ok: false,
+      host,
+      host_label: hostEntry.label,
+      command: cmd,
+      error: e.message,
+      elapsed_ms: elapsed,
+    });
+  }
+});
 
 module.exports = router;
 module.exports.setSafePythonSpawn = setSafePythonSpawn;
