@@ -800,7 +800,7 @@ router.post('/bruce/ssh/exec', async (req, res) => {
     await ssh.connect({
       host,
       username: hostEntry.user,
-      privateKey: BRUCE_SSH_KEY_PATH,
+      privateKeyPath: BRUCE_SSH_KEY_PATH,
       readyTimeout: 8000,
       keepaliveInterval: 5000,
     });
