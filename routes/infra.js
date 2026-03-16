@@ -30,6 +30,7 @@ const { pingUrl } = require('../shared/helpers');
 const { fetchWithTimeout } = require('../shared/fetch-utils');
 const { NodeSSH } = require('node-ssh');
 const { validateExecCommand } = require('../shared/exec-security');
+const { loadTopicContext } = require('../shared/topic-context');
 
 // safePythonSpawn injected from server.js via module.exports function
 let _safePythonSpawn = null;
@@ -459,13 +460,14 @@ router.post('/bruce/bootstrap', async (req, res) => {
 
   try {
     // Run integrity + session/init in PARALLEL via internal loopback
-    const [integrityRes, sessionRes] = await Promise.all([
+    const [integrityRes, sessionRes, topicContext] = await Promise.all([
       fetchWithTimeout(LOOPBACK_BASE_URL + ':' + PORT + '/bruce/integrity', { headers: hGw }, 10000),
       fetchWithTimeout(LOOPBACK_BASE_URL + ':' + PORT + '/bruce/session/init', {
         method: 'POST',
         headers: hGw,
         body: JSON.stringify({ topic, scope: 'homelab,general', profile, include_tasks: includeTasks, include_lessons: includeLessons, include_state: includeState })
-      }, 18000)
+      }, 18000),
+      loadTopicContext(topic, SUPABASE_URL, SUPABASE_KEY),
     ]);
 
     const integrityData = await integrityRes.json();
@@ -484,6 +486,7 @@ router.post('/bruce/bootstrap', async (req, res) => {
           Object.entries(integrityData.checks || {}).map(([k, v]) => [k, v.ok])
         )
       },
+      context: topicContext,
       briefing: sessionData.briefing || null,
       dashboard: sessionData.dashboard || null,
       next_tasks: sessionData.next_tasks || [],
