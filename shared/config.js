@@ -51,6 +51,30 @@ const BRUCE_FALLBACK_LOG_PATH =
 const BRUCE_SOURCE_DEFAULT =
   process.env.BRUCE_SOURCE_DEFAULT || 'openwebui';
 
+const BRUCE_SSH_KEY_PATH =
+  process.env.BRUCE_SSH_KEY_PATH || '/home/node/.ssh/id_ed25519';
+const DEFAULT_BRUCE_SSH_HOSTS = {
+  '192.168.2.32': { user: 'furycom', label: 'dell-7910' },
+  '192.168.2.146': { user: 'furycom', label: 'furysupa' },
+  '192.168.2.154': { user: 'yann', label: 'box2-observability' },
+  '192.168.2.174': { user: 'yann', label: 'box2-n8n' },
+  '192.168.2.85': { user: 'furycom', label: 'embedder' },
+  '192.168.2.231': { user: 'furycom', label: 'furycom-231' },
+  '192.168.2.230': { user: 'furycom', label: 'gateway-host' },
+};
+
+let BRUCE_SSH_HOSTS = DEFAULT_BRUCE_SSH_HOSTS;
+if (process.env.BRUCE_SSH_HOSTS_JSON) {
+  try {
+    const parsed = JSON.parse(process.env.BRUCE_SSH_HOSTS_JSON);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      BRUCE_SSH_HOSTS = parsed;
+    }
+  } catch (err) {
+    console.error('[config.js] invalid BRUCE_SSH_HOSTS_JSON:', err.message || err);
+  }
+}
+
 // Paths
 const CONNECTORS_PATH = path.join(__dirname, '..', 'connectors.json');
 
@@ -82,5 +106,7 @@ module.exports = {
   BRUCE_MAX_CONCURRENT,
   BRUCE_FALLBACK_LOG_PATH,
   BRUCE_SOURCE_DEFAULT,
+  BRUCE_SSH_KEY_PATH,
+  BRUCE_SSH_HOSTS,
   CONNECTORS_PATH,
 };
