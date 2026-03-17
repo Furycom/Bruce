@@ -37,7 +37,7 @@ const BLACKLIST = [
   />\s*\/dev\/sd/,
   /chmod\s+777\b/,
   /shutdown|reboot|poweroff|init\s+[06]/,
-  /&&/,                            // chaînage interdit
+  // [995] && autorise si chaque partie passe la whitelist individuellement
   /\|.*\|/,                        // double pipe interdit (single pipe OK)
   /;\s*rm\b/,                      // injection via ;
   /`/,                             // backtick injection
@@ -56,6 +56,18 @@ const BLACKLIST = [
 function validateExecCommand(cmd) {
   const trimmed = (cmd || '').trim();
   if (!trimmed) return { allowed: false, reason: 'Empty command' };
+
+  // [995] Handle && chaining: split and validate each part independently
+  if (/&&/.test(trimmed)) {
+    const parts = trimmed.split(/\s*&&\s*/);
+    for (const part of parts) {
+      const result = validateExecCommand(part.trim());
+      if (!result.allowed) {
+        return { allowed: false, reason: `Chained command blocked: "${part.trim()}" - ${result.reason}` };
+      }
+    }
+    return { allowed: true };
+  }
 
   // Check blacklist first (higher priority)
   for (const pat of BLACKLIST) {
