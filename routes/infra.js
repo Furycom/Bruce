@@ -31,6 +31,7 @@ const { fetchWithTimeout } = require('../shared/fetch-utils');
 const { NodeSSH } = require('node-ssh');
 const { validateExecCommand } = require('../shared/exec-security');
 const { loadTopicContext } = require('../shared/topic-context');
+const { estimateTokens, truncateToTokens } = require('../shared/context-engine');
 
 // safePythonSpawn injected from server.js via module.exports function
 let _safePythonSpawn = null;
@@ -528,6 +529,200 @@ router.post('/bruce/bootstrap', async (req, res) => {
   } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e), elapsed_ms: Date.now() - startMs });
   }
+});
+
+
+// === /bruce/context/fetch — [CE-6] On-demand context retrieval mid-session ===
+/**
+ * Handles POST /bruce/context/fetch.
+ * Lightweight context endpoint for mid-session use.
+ * Returns topic-aware rules/runbooks, RAG results, and optionally lessons,
+ * all budgeted within a token limit.
+ *
+ * Body params:
+ *   topic (string, required) — subject to fetch context for
+ *   budget_tokens (int, optional, default 1000) — max tokens for the response
+ *   sources (string[], optional, default all) — subset of ['kb', 'lessons', 'tools', 'profile']
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+router.post('/bruce/context/fetch', async (req, res) => {
+  const auth = validateBruceAuth(req);
+  if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
+
+  const topic = (req.body && req.body.topic) ? String(req.body.topic).slice(0, 200).trim() : '';
+  if (!topic) return res.status(400).json({ ok: false, error: 'topic is required' });
+
+  const budgetTokens = Math.min(Math.max(parseInt(req.body.budget_tokens) || 1000, 200), 3000);
+  const allSources = ['kb', 'lessons', 'tools', 'profile'];
+  const sources = (Array.isArray(req.body.sources) && req.body.sources.length > 0)
+    ? req.body.sources.filter(s => allSources.includes(s))
+    : allSources;
+
+  const startMs = Date.now();
+  const CHARS_PER_TOKEN = 4;
+  const parts = [];
+  const sourcesUsed = [];
+  let usedTokens = 0;
+
+  const base = String(SUPABASE_URL || '').replace(/\/+$/, '');
+  const key = String(SUPABASE_KEY || '');
+  const hSupa = { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' };
+
+  try {
+    // --- 1. Topic context: rules, runbooks, tools (via loadTopicContext) ---
+    if (sources.includes('kb') || sources.includes('tools')) {
+      const topicCtx = await loadTopicContext(topic, SUPABASE_URL, SUPABASE_KEY);
+      if (topicCtx.tools_loaded && topicCtx.tools_loaded.length > 0 && sources.includes('tools')) {
+        const toolsText = '**OUTILS (' + topic + '):** ' + topicCtx.tools_loaded.join(', ');
+        const toolsTrunc = truncateToTokens(toolsText, Math.min(150, budgetTokens - usedTokens));
+        parts.push(toolsTrunc);
+        usedTokens += estimateTokens(toolsTrunc);
+        sourcesUsed.push('tools');
+      }
+      if (sources.includes('kb')) {
+        // Rules
+        if (topicCtx.rules && topicCtx.rules.length > 0) {
+          const rulesLines = topicCtx.rules.slice(0, 5).map(r =>
+            '- [' + r.source + '] ' + truncateToTokens(r.text, 80)
+          );
+          const rulesBudget = Math.min(300, budgetTokens - usedTokens);
+          if (rulesBudget > 50) {
+            const rulesText = '**RÈGLES (' + topic + '):**\n' + rulesLines.join('\n');
+            const rulesTrunc = truncateToTokens(rulesText, rulesBudget);
+            parts.push(rulesTrunc);
+            usedTokens += estimateTokens(rulesTrunc);
+            sourcesUsed.push('kb_rules');
+          }
+        }
+        // Runbooks
+        if (topicCtx.runbooks && topicCtx.runbooks.length > 0) {
+          const rbLines = topicCtx.runbooks.slice(0, 3).map(r =>
+            '- [' + r.source + '] ' + r.category + '/' + r.subcategory + ': ' + truncateToTokens(r.text, 100)
+          );
+          const rbBudget = Math.min(300, budgetTokens - usedTokens);
+          if (rbBudget > 50) {
+            const rbText = '**RUNBOOKS (' + topic + '):**\n' + rbLines.join('\n');
+            const rbTrunc = truncateToTokens(rbText, rbBudget);
+            parts.push(rbTrunc);
+            usedTokens += estimateTokens(rbTrunc);
+            sourcesUsed.push('kb_runbooks');
+          }
+        }
+      }
+    }
+
+    // --- 2. RAG semantic search ---
+    if (sources.includes('kb') && (budgetTokens - usedTokens) > 100) {
+      try {
+        const embedRes = await fetchWithTimeout(
+          EMBEDDER_URL + '/embed',
+          { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ inputs: topic, max_length: 256 }) },
+          6000
+        );
+        const embedData = await embedRes.json();
+        const embedding = Array.isArray(embedData) ? embedData[0] : (embedData && embedData.embeddings && embedData.embeddings[0]);
+        if (embedding) {
+          const qvec = '[' + embedding.map(x => Number(x)).join(',') + ']';
+          const ragRes = await fetchWithTimeout(
+            base + '/rpc/bruce_rag_hybrid_search_text',
+            { method: 'POST', headers: { ...hSupa },
+              body: JSON.stringify({ qtext: topic, qvec: qvec, k: 6 }) },
+            8000
+          );
+          const ragData = await ragRes.json();
+          if (Array.isArray(ragData) && ragData.length > 0) {
+            const ragBudget = Math.min(350, budgetTokens - usedTokens);
+            const ragItems = ragData
+              .slice(0, 5)
+              .map(r => {
+                const score = Math.round((r.hybrid_score || r.cos_sim || 0) * 100) / 100;
+                return '(' + score + ') ' + truncateToTokens((r.preview || '').trim(), 70);
+              });
+            const ragText = '**RAG ("' + topic.slice(0, 30) + '"):**\n' + ragItems.join('\n');
+            const ragTrunc = truncateToTokens(ragText, ragBudget);
+            parts.push(ragTrunc);
+            usedTokens += estimateTokens(ragTrunc);
+            sourcesUsed.push('rag');
+          }
+        }
+      } catch (ragErr) {
+        console.error('[infra.js][context/fetch] RAG error:', ragErr.message);
+      }
+    }
+
+    // --- 3. Recent lessons related to topic ---
+    if (sources.includes('lessons') && (budgetTokens - usedTokens) > 80) {
+      try {
+        const lessonsRes = await fetchWithTimeout(
+          base + '/lessons_learned?lesson_text=ilike.*' + encodeURIComponent(topic) + '*&order=date_learned.desc&limit=5&select=id,lesson_type,lesson_text,importance,date_learned',
+          { headers: { apikey: key, Authorization: 'Bearer ' + key } },
+          5000
+        );
+        if (lessonsRes.ok) {
+          const lessons = await lessonsRes.json();
+          if (Array.isArray(lessons) && lessons.length > 0) {
+            const lessonBudget = Math.min(250, budgetTokens - usedTokens);
+            const lessonLines = lessons.slice(0, 3).map(l =>
+              '- [' + l.importance + '] ' + truncateToTokens((l.lesson_text || ''), 70)
+            );
+            const lessonText = '**LEÇONS ("' + topic.slice(0, 20) + '"):**\n' + lessonLines.join('\n');
+            const lessonTrunc = truncateToTokens(lessonText, lessonBudget);
+            parts.push(lessonTrunc);
+            usedTokens += estimateTokens(lessonTrunc);
+            sourcesUsed.push('lessons');
+          }
+        }
+      } catch (lessErr) {
+        console.error('[infra.js][context/fetch] Lessons error:', lessErr.message);
+      }
+    }
+
+    // --- 4. User profile critical exigences ---
+    if (sources.includes('profile') && (budgetTokens - usedTokens) > 50) {
+      try {
+        const profRes = await fetchWithTimeout(
+          base + '/user_profile?category=eq.exigence&priority=eq.critical&status=eq.active&select=observation&limit=5',
+          { headers: { apikey: key, Authorization: 'Bearer ' + key } },
+          3000
+        );
+        if (profRes.ok) {
+          const exigences = await profRes.json();
+          if (Array.isArray(exigences) && exigences.length > 0) {
+            const exBudget = Math.min(150, budgetTokens - usedTokens);
+            const exLines = exigences.map(e => '- ' + truncateToTokens(e.observation, 50));
+            const exText = '**EXIGENCES:**\n' + exLines.join('\n');
+            const exTrunc = truncateToTokens(exText, exBudget);
+            parts.push(exTrunc);
+            usedTokens += estimateTokens(exTrunc);
+            sourcesUsed.push('profile');
+          }
+        }
+      } catch (profErr) {
+        console.error('[infra.js][context/fetch] Profile error:', profErr.message);
+      }
+    }
+
+  } catch (e) {
+    console.error('[infra.js][context/fetch] Error:', e.message);
+    return res.status(500).json({ ok: false, error: String(e.message || e), elapsed_ms: Date.now() - startMs });
+  }
+
+  const contextPrompt = parts.join('\n\n');
+  return res.json({
+    ok: true,
+    topic,
+    context_prompt: contextPrompt,
+    context_meta: {
+      sources_used: sourcesUsed,
+      total_tokens: estimateTokens(contextPrompt),
+      budget_tokens: budgetTokens,
+      budget_used_pct: Math.round((estimateTokens(contextPrompt) / budgetTokens) * 100)
+    },
+    elapsed_ms: Date.now() - startMs
+  });
 });
 
 
