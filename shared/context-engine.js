@@ -13,6 +13,10 @@ const TOKEN_BUDGET = {
   total: 2000     // Max for Claude context_prompt
 };
 
+// [CE-0b] Cache user_profile — TTL 5 minutes (mêmes données changent rarement)
+let _userProfileCache = { data: null, ts: 0 };
+const USER_PROFILE_CACHE_TTL = 5 * 60 * 1000;
+
 const CHARS_PER_TOKEN = 4;
 
 function estimateTokens(text) {
@@ -43,17 +47,25 @@ async function buildAnchorLayer(currentState, dashboard) {
     usedTokens += estimateTokens(hText) + 5;
   }
 
-  // 1b. User profile + exigences + wishes from Supabase
+  // 1b. User profile + exigences + wishes (cached, TTL 5min) [CE-0b]
   try {
-    const base = String(SUPABASE_URL || '').replace(/\/+$/, '');
-    const key = String(SUPABASE_KEY || '');
-    // Fetch active entries only, sorted by priority
-    const res = await fetchWithTimeout(
-      base + '/user_profile?status=eq.active&select=category,subcategory,observation,priority&order=priority.asc,category.asc',
-      { headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' } },
-      3000
-    );
-    const rows = await res.json();
+    let rows;
+    const now = Date.now();
+    if (_userProfileCache.data && (now - _userProfileCache.ts) < USER_PROFILE_CACHE_TTL) {
+      rows = _userProfileCache.data;
+    } else {
+      const base = String(SUPABASE_URL || '').replace(/\/+$/, '');
+      const key = String(SUPABASE_KEY || '');
+      const res = await fetchWithTimeout(
+        base + '/user_profile?status=eq.active&select=category,subcategory,observation,priority&order=priority.asc,category.asc',
+        { headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Accept': 'application/json' } },
+        3000
+      );
+      rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        _userProfileCache = { data: rows, ts: now };
+      }
+    }
     if (Array.isArray(rows) && rows.length > 0) {
       const byCategory = {};
       for (const r of rows) {
