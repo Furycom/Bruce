@@ -45,6 +45,7 @@ const TOPIC_SYNONYMS = {
   'github': 'codex', pr: 'codex',
   'optimize': 'dspy', mipro: 'dspy',
   bootstrap: 'session',
+  audit: 'session', context: 'session',
 };
 
 /**

@@ -373,9 +373,9 @@ router.get('/bruce/integrity', async (req, res) => {
       return { ok: r.status === 200 };
     }),
     safeCheck('local-llm', async () => {
-      const r = await fetchWithTimeout(LITELLM_URL + '/health',
-        { headers: { 'Authorization': 'Bearer ' + (BRUCE_LLM_API_KEY || 'token-abc123') } }, 5000);
-      return { ok: r.status === 200 };
+      const r = await fetchWithTimeout(LITELLM_URL + '/health/liveliness', // [audit-1198] /health blocks on backend timeout
+        { headers: { 'Authorization': 'Bearer ' + (BRUCE_LITELLM_KEY || 'bruce-litellm-key-01') } }, 5000);
+      const txt = await r.text(); return { ok: r.status === 200 && txt.includes('alive') };
     }),
     safeCheck('validate_service', async () => {
       const r = await fetchWithTimeout(VALIDATE_SERVICE_URL + '/health', {}, 4000);
@@ -384,12 +384,12 @@ router.get('/bruce/integrity', async (req, res) => {
     }),
     safeCheck('n8n', async () => {
       const r = await fetchWithTimeout(MCP_PLAYWRIGHT_URL + '/healthz', {}, 4000);
-      return { ok: r.status === 200 };
+      const txt = await r.text(); return { ok: r.status === 200 && txt.includes('ok') };
     }),
     safeCheck('litellm', async () => {
       // [902] LiteLLM /health requires auth; use / which returns 200 without auth
-      const r = await fetchWithTimeout(VLLM_INTERNAL_URL + '/', {}, 4000);
-      return { ok: r.status === 200 };
+      const r = await fetchWithTimeout(VLLM_INTERNAL_URL + '/health/liveliness', {}, 4000);
+      const txt = await r.text(); return { ok: r.status === 200 && txt.includes('alive') };
     }),
     safeCheck('sequences', async () => {
       const r = await fetchWithTimeout(base + '/rpc/check_sequences', {
@@ -512,7 +512,22 @@ router.post('/bruce/bootstrap', async (req, res) => {
       context_prompt: sessionData.context_prompt || null,
       context_meta: sessionData.context_meta || null,
       dashboard: sessionData.dashboard || null,
-      next_tasks: sessionData.next_tasks || []
+      next_tasks: sessionData.next_tasks || [],
+      // [1024] Service registry - all BRUCE services with IP:port:ssh_alias
+      services: [
+        { name: 'gateway', url: 'http://192.168.2.230:4000', ssh: 'furymcp', role: 'MCP Gateway' },
+        { name: 'supabase', url: 'http://192.168.2.146:8000', ssh: 'furysupa', role: 'PostgreSQL/REST' },
+        { name: 'llama-server', url: 'http://192.168.2.32:8000', ssh: 'furycomai', role: 'LLM Qwen3-32B' },
+        { name: 'litellm', url: 'http://192.168.2.230:4100', ssh: 'furymcp', role: 'LLM proxy' },
+        { name: 'n8n', url: 'http://192.168.2.174:5678', ssh: 'box2-automation', role: 'Workflow automation' },
+        { name: 'embedder', url: 'http://192.168.2.85:8081', ssh: null, role: 'BGE-m3 embeddings' },
+        { name: 'validate', url: 'http://192.168.2.230:4001', ssh: 'furymcp', role: 'Quality gates' },
+        { name: 'pulse', url: 'http://192.168.2.154:7655', ssh: 'box2-observability', role: 'Monitoring' },
+        { name: 'langfuse', url: 'http://192.168.2.154:3200', ssh: 'box2-observability', role: 'LLM observability' },
+        { name: 'forgejo', url: 'http://192.168.2.230:3300', ssh: 'furymcp', role: 'Git forge' },
+        { name: 'lightrag', url: 'http://192.168.2.230:9621', ssh: 'furymcp', role: 'Graph RAG' },
+        { name: 'openwebui', url: 'http://192.168.2.32:3000', ssh: 'furycomai', role: 'LLM web UI' },
+      ]
     };
 
     // In full mode (compact=false), include raw data fields
@@ -842,7 +857,7 @@ async function runFullHealthChecks() {
     { name: 'embedder', url: _trimUrl(EMBEDDER_URL) ? _trimUrl(EMBEDDER_URL) + '/health' : null },
     { name: 'n8n', url: _trimUrl(MCP_PLAYWRIGHT_URL) ? _trimUrl(MCP_PLAYWRIGHT_URL) + '/healthz' : null },
     { name: 'validate-svc', url: _trimUrl(VALIDATE_SERVICE_URL) ? _trimUrl(VALIDATE_SERVICE_URL) + '/health' : null },
-    { name: 'litellm', url: _trimUrl(VLLM_INTERNAL_URL) ? _trimUrl(VLLM_INTERNAL_URL) + '/' : null },
+    { name: 'litellm', url: _trimUrl(VLLM_INTERNAL_URL) ? _trimUrl(VLLM_INTERNAL_URL) + '/health/liveliness' : null },
     { name: 'pulse', url: pulseBase ? pulseBase + '/api/resources' : null, headers: { 'Authorization': PULSE_AUTH } },
   ];
 

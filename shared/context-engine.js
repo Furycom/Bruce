@@ -91,7 +91,7 @@ async function buildAnchorLayer(currentState, dashboard) {
       const profileLines = [];
       for (const cat of profileCats) {
         if (byCategory[cat]) {
-          const obs = byCategory[cat].slice(0, 1).map(o => truncateToTokens(o.text, 50)).join('');
+          const obs = byCategory[cat].slice(0, 1).map(o => truncateToTokens(o.text, 75)).join('');
           profileLines.push(cat.replace(/_/g, ' ') + ': ' + obs);
         }
       }

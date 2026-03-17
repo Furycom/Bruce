@@ -258,7 +258,7 @@ router.post('/bruce/session/init', async (req, res) => {
           const fusedFiltered = fusedSorted.filter(l => !seen.has(l.id));
           fusedFiltered.forEach(l => seen.add(l.id));
           const recentFiltered = recentCritical.filter(l => !seen.has(l.id));
-          const lessonLimit = (rpcProfile === 'light') ? 3 : (rpcProfile === 'minimal') ? 1 : 10; // [772] C6
+          const lessonLimit = (rpcProfile === 'light') ? 3 : (rpcProfile === 'minimal') ? 1 : 5; // [772] C6
           routedLessons = [...canonicalLock, ...fusedFiltered, ...recentFiltered].slice(0, lessonLimit);
         }
       } catch (routerErr) { console.error(`[session.js] operation failed:`, routerErr.message);
@@ -355,7 +355,7 @@ Sois direct, precis, actionnable.`;
             metadata: { trace_name: 'bruce-bootstrap', generation_name: 'bootstrap-summary' }
           })
         },
-        15000
+        5000  // [audit-1198] reduced from 15s — failfast if LLM down
       );
       const llmData = await llmRes.json();
       llmSummary = llmData?.choices?.[0]?.message?.content || null;
@@ -405,6 +405,7 @@ Sois direct, precis, actionnable.`;
     if (llmIdentity === 'claude') {
       const ceResult = await buildContextForClaude({
         dashboard,
+
         tasks: roadmap,
         lessons: effectiveLessons,
         ragResults,
@@ -438,8 +439,8 @@ Sois direct, precis, actionnable.`;
       llm_ok: llmOk,
       dashboard,
       // [829] Compact next_tasks: strip descriptions to save ~4000 tokens
-      next_tasks: includeTasks ? roadmap.slice(0, 100).map(t => ({ id: t.id, status: t.status, priority: t.priority, step_name: t.step_name, model_hint: t.model_hint })) : [],
-      critical_lessons: includeLessons ? effectiveLessons : [],
+      next_tasks: includeTasks ? roadmap.filter(t => t.priority !== "P5").slice(0, 100).map(t => ({ id: t.id, status: t.status, priority: t.priority, step_name: t.step_name, model_hint: t.model_hint })) : [],
+      critical_lessons: includeLessons ? effectiveLessons.map(l => ({...l, lesson_text: l.lesson_text ? l.lesson_text.slice(0, 250) : ''})) : [],
       last_session: lastSession,
       rag_context: ragResults,
       current_state: includeState ? currentState : [],
