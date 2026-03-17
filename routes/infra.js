@@ -454,6 +454,8 @@ router.post('/bruce/bootstrap', async (req, res) => {
   const includeTasks = req.body && req.body.include_tasks === false ? false : true;
   const includeLessons = req.body && req.body.include_lessons === false ? false : true;
   const includeState = req.body && req.body.include_state === false ? false : true;
+  // [CE-5] Compact mode: only context_prompt + essential fields, skip raw data already in context_prompt
+  const compact = req.body && req.body.compact === true;
   const startMs = Date.now();
 
   const hGw = { 'Authorization': 'Bearer ' + (BRUCE_AUTH_TOKEN || 'bruce-secret-token-01'), 'Content-Type': 'application/json' };
@@ -473,12 +475,14 @@ router.post('/bruce/bootstrap', async (req, res) => {
     const integrityData = await integrityRes.json();
     const sessionData = await sessionRes.json();
 
-    return res.json({
+    // [CE-5] Build response — compact mode excludes fields already summarized in context_prompt
+    const response = {
       ok: true,
       generated_at: new Date().toISOString(),
       elapsed_ms: Date.now() - startMs,
       session_id: sessionData.session_id || null,
       model_filter: model || null,
+      compact: compact, // [CE-5] Echo back so caller knows which mode was used
       integrity: {
         ok: integrityData.ok,
         verdict: integrityData.verdict,
@@ -487,15 +491,23 @@ router.post('/bruce/bootstrap', async (req, res) => {
         )
       },
       context: topicContext,
-      briefing: sessionData.briefing || null,
+      context_prompt: sessionData.context_prompt || null,
+      context_meta: sessionData.context_meta || null,
       dashboard: sessionData.dashboard || null,
-      next_tasks: sessionData.next_tasks || [],
-      critical_lessons: sessionData.critical_lessons || [],
-      last_session: sessionData.last_session || null,
-      current_state: sessionData.current_state || [],
-      clarifications_pending: sessionData.clarifications_pending || [],
-      rag_context: sessionData.rag_context || []
-    });
+      next_tasks: sessionData.next_tasks || []
+    };
+
+    // In full mode (compact=false), include raw data fields
+    if (!compact) {
+      response.briefing = sessionData.briefing || null;
+      response.critical_lessons = sessionData.critical_lessons || [];
+      response.last_session = sessionData.last_session || null;
+      response.current_state = sessionData.current_state || [];
+      response.clarifications_pending = sessionData.clarifications_pending || [];
+      response.rag_context = sessionData.rag_context || [];
+    }
+
+    return res.json(response);
   } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e), elapsed_ms: Date.now() - startMs });
   }
