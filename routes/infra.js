@@ -487,6 +487,8 @@ router.post('/bruce/bootstrap', async (req, res) => {
         )
       },
       context: topicContext,
+      context_prompt: sessionData.context_prompt || null,
+      context_meta: sessionData.context_meta || null,
       briefing: sessionData.briefing || null,
       dashboard: sessionData.dashboard || null,
       next_tasks: sessionData.next_tasks || [],
