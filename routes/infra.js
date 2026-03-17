@@ -456,7 +456,24 @@ router.post('/bruce/bootstrap', async (req, res) => {
   const includeState = req.body && req.body.include_state === false ? false : true;
   const startMs = Date.now();
 
-  const hGw = { 'Authorization': 'Bearer ' + (BRUCE_AUTH_TOKEN || 'bruce-secret-token-01'), 'Content-Type': 'application/json' };
+  // [CE-2] Map bootstrap model param to LLM identity for session/init
+  const MODEL_TO_IDENTITY = {
+    'opus': 'claude',
+    'sonnet': 'claude',
+    'code': 'claude',
+    'codex': 'claude',
+    'chatgpt': 'chatgpt',
+    'local-llm': 'local-llm',
+    'vllm': 'local-llm',
+    'qwen': 'local-llm'
+  };
+  const llmIdentity = MODEL_TO_IDENTITY[model.toLowerCase()] || 'claude';
+
+  const hGw = {
+    'Authorization': 'Bearer ' + (BRUCE_AUTH_TOKEN || 'bruce-secret-token-01'),
+    'Content-Type': 'application/json',
+    'x-llm-identity': llmIdentity  // [CE-2] Forward identity to session/init
+  };
 
   try {
     // Run integrity + session/init in PARALLEL via internal loopback
