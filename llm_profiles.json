@@ -12,6 +12,19 @@
       "dspy_module": null,
       "enabled": true
     },
+    "moe35b_triage": {
+      "name": "Qwen3.5-35B-A3B MoE Q4_K_M",
+      "gguf_dir": "qwen35-35b-a3b-q4km",
+      "speed_tps": 10.8,
+      "bench_score": 0.793,
+      "context_length": 16384,
+      "capabilities": ["triage", "pre_filter", "dedup"],
+      "layer": 1,
+      "docker_extra_args": "--reasoning off",
+      "dspy_module": "/home/furycom/dspy_results_35b_moe_labeled/module_bfsrs.json",
+      "dspy_score": 1.0,
+      "enabled": true
+    },
     "moe_prefilter": {
       "name": "Qwen3-30B-A3B MoE Q4_K_M",
       "gguf_dir": "qwen3-30b-a3b-q4km",
@@ -22,7 +35,9 @@
       "layer": 1,
       "docker_extra_args": "--reasoning off",
       "dspy_module": "/home/furycom/dspy_results_moe_v4_dual/optB_module.json",
-      "enabled": true
+      "dspy_score": 0.883,
+      "enabled": false,
+      "note": "Replaced by moe35b_triage (higher quality, BFSRS 100%)"
     },
     "mid_14b": {
       "name": "Qwen3-14B Q4_K_M",
@@ -34,6 +49,7 @@
       "layer": 2,
       "docker_extra_args": "--reasoning off",
       "dspy_module": "/home/furycom/dspy_results_14b_bootstrap/best_module_labeled.json",
+      "dspy_score": 0.9875,
       "enabled": true
     },
     "fast_9b": {
@@ -46,7 +62,21 @@
       "layer": 1,
       "docker_extra_args": "--reasoning off",
       "dspy_module": null,
-      "enabled": false
+      "enabled": false,
+      "note": "DSPy review in progress"
+    },
+    "mid_27b": {
+      "name": "Qwen3.5-27B Q4_K_M",
+      "gguf_dir": "qwen35-27b-q4km",
+      "speed_tps": 3.7,
+      "bench_score": 0.8,
+      "context_length": 16384,
+      "capabilities": ["lesson_review", "kb_audit", "session_summary"],
+      "layer": 2,
+      "docker_extra_args": "--reasoning off",
+      "dspy_module": null,
+      "enabled": false,
+      "note": "Good quality but slow (3.7 t/s). Could be Layer 2 alternative."
     },
     "valkyrie": {
       "name": "Valkyrie-49B Q3_K_M (uncensored)",
@@ -63,7 +93,7 @@
   },
   "routing": {
     "lesson_review": {
-      "pipeline": ["moe_prefilter", "mid_14b", "alpha"],
+      "pipeline": ["moe35b_triage", "mid_14b", "alpha"],
       "confidence_threshold": 0.9,
       "fallback": "alpha"
     },
@@ -73,8 +103,8 @@
       "fallback": "alpha"
     },
     "dedup": {
-      "pipeline": ["alpha"],
-      "confidence_threshold": 1.0,
+      "pipeline": ["moe35b_triage", "alpha"],
+      "confidence_threshold": 0.9,
       "fallback": "alpha"
     },
     "ingestion": {
@@ -88,8 +118,8 @@
       "fallback": null
     },
     "session_summary": {
-      "pipeline": ["alpha"],
-      "confidence_threshold": 1.0,
+      "pipeline": ["mid_14b"],
+      "confidence_threshold": 0.9,
       "fallback": "alpha"
     }
   },
@@ -97,7 +127,7 @@
     "docker_container_name": "llama-server",
     "docker_image": "ghcr.io/ggml-org/llama.cpp:server-cuda",
     "base_docker_args": "--gpus all -p 8000:8080 --restart unless-stopped",
-    "health_check_url": "http://localhost:8000/health",
+    "health_check_url": "http://192.168.2.32:8000/health",
     "health_check_timeout": 120,
     "health_check_interval": 5,
     "models_base_dir": "/srv/models",
