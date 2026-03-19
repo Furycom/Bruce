@@ -1,0 +1,109 @@
+{
+  "models": {
+    "alpha": {
+      "name": "Qwen3-32B Q4_K_M",
+      "gguf_dir": "qwen3-32b-q4km",
+      "speed_tps": 2.4,
+      "bench_score": 0.947,
+      "context_length": 16384,
+      "capabilities": ["lesson_review", "kb_audit", "ingestion", "session_summary", "dedup", "verification"],
+      "layer": 3,
+      "docker_extra_args": "--reasoning off",
+      "dspy_module": null,
+      "enabled": true
+    },
+    "moe_prefilter": {
+      "name": "Qwen3-30B-A3B MoE Q4_K_M",
+      "gguf_dir": "qwen3-30b-a3b-q4km",
+      "speed_tps": 18.0,
+      "bench_score": 0.743,
+      "context_length": 16384,
+      "capabilities": ["triage", "pre_filter"],
+      "layer": 1,
+      "docker_extra_args": "--reasoning off",
+      "dspy_module": "/home/furycom/dspy_results_moe_v4_dual/optB_module.json",
+      "enabled": true
+    },
+    "mid_14b": {
+      "name": "Qwen3-14B Q4_K_M",
+      "gguf_dir": "qwen3-14b-q4km",
+      "speed_tps": 10.0,
+      "bench_score": 0.75,
+      "context_length": 16384,
+      "capabilities": ["lesson_review", "kb_audit"],
+      "layer": 2,
+      "docker_extra_args": "--reasoning off",
+      "dspy_module": "/home/furycom/dspy_results_14b_bootstrap/best_module_labeled.json",
+      "enabled": true
+    },
+    "fast_9b": {
+      "name": "Qwen3.5-9B Q4_K_M",
+      "gguf_dir": "qwen35-9b-q4km",
+      "speed_tps": 9.0,
+      "bench_score": 0.8,
+      "context_length": 16384,
+      "capabilities": ["triage", "pre_filter", "lesson_review"],
+      "layer": 1,
+      "docker_extra_args": "--reasoning off",
+      "dspy_module": null,
+      "enabled": false
+    },
+    "valkyrie": {
+      "name": "Valkyrie-49B Q3_K_M (uncensored)",
+      "gguf_dir": "valkyrie-49b-q3km",
+      "speed_tps": 1.8,
+      "bench_score": 0.927,
+      "context_length": 16384,
+      "capabilities": ["lesson_review", "kb_audit", "ingestion", "verification"],
+      "layer": 3,
+      "docker_extra_args": "",
+      "dspy_module": null,
+      "enabled": false
+    }
+  },
+  "routing": {
+    "lesson_review": {
+      "pipeline": ["moe_prefilter", "mid_14b", "alpha"],
+      "confidence_threshold": 0.9,
+      "fallback": "alpha"
+    },
+    "kb_audit": {
+      "pipeline": ["mid_14b", "alpha"],
+      "confidence_threshold": 0.9,
+      "fallback": "alpha"
+    },
+    "dedup": {
+      "pipeline": ["alpha"],
+      "confidence_threshold": 1.0,
+      "fallback": "alpha"
+    },
+    "ingestion": {
+      "pipeline": ["alpha"],
+      "confidence_threshold": 1.0,
+      "fallback": "alpha"
+    },
+    "lightrag": {
+      "pipeline": [],
+      "confidence_threshold": 1.0,
+      "fallback": null
+    },
+    "session_summary": {
+      "pipeline": ["alpha"],
+      "confidence_threshold": 1.0,
+      "fallback": "alpha"
+    }
+  },
+  "swap_config": {
+    "docker_container_name": "llama-server",
+    "docker_image": "ghcr.io/ggml-org/llama.cpp:server-cuda",
+    "base_docker_args": "--gpus all -p 8000:8080 --restart unless-stopped",
+    "health_check_url": "http://localhost:8000/health",
+    "health_check_timeout": 120,
+    "health_check_interval": 5,
+    "models_base_dir": "/srv/models",
+    "ssh_alias": "furycomai",
+    "gpu_layers": 99,
+    "default_ctx_size": 16384,
+    "default_threads": 24
+  }
+}
