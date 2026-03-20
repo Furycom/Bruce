@@ -6,7 +6,14 @@
       "speed_tps": 2.4,
       "bench_score": 0.947,
       "context_length": 16384,
-      "capabilities": ["lesson_review", "kb_audit", "ingestion", "session_summary", "dedup", "verification"],
+      "capabilities": [
+        "lesson_review",
+        "kb_audit",
+        "ingestion",
+        "session_summary",
+        "dedup",
+        "verification"
+      ],
       "layer": 3,
       "docker_extra_args": "--reasoning off",
       "dspy_module": null,
@@ -18,7 +25,11 @@
       "speed_tps": 10.8,
       "bench_score": 0.793,
       "context_length": 16384,
-      "capabilities": ["triage", "pre_filter", "dedup"],
+      "capabilities": [
+        "triage",
+        "pre_filter",
+        "dedup"
+      ],
       "layer": 1,
       "docker_extra_args": "--reasoning off",
       "dspy_module": "/home/furycom/dspy_results_35b_moe_labeled/module_bfsrs.json",
@@ -31,7 +42,10 @@
       "speed_tps": 18.0,
       "bench_score": 0.743,
       "context_length": 16384,
-      "capabilities": ["triage", "pre_filter"],
+      "capabilities": [
+        "triage",
+        "pre_filter"
+      ],
       "layer": 1,
       "docker_extra_args": "--reasoning off",
       "dspy_module": "/home/furycom/dspy_results_moe_v4_dual/optB_module.json",
@@ -45,7 +59,10 @@
       "speed_tps": 10.0,
       "bench_score": 0.75,
       "context_length": 16384,
-      "capabilities": ["lesson_review", "kb_audit"],
+      "capabilities": [
+        "lesson_review",
+        "kb_audit"
+      ],
       "layer": 2,
       "docker_extra_args": "--reasoning off",
       "dspy_module": "/home/furycom/dspy_results_14b_bootstrap/best_module_labeled.json",
@@ -58,7 +75,11 @@
       "speed_tps": 9.0,
       "bench_score": 0.8,
       "context_length": 16384,
-      "capabilities": ["triage", "pre_filter", "lesson_review"],
+      "capabilities": [
+        "triage",
+        "pre_filter",
+        "lesson_review"
+      ],
       "layer": 1,
       "docker_extra_args": "--reasoning off",
       "dspy_module": null,
@@ -71,7 +92,11 @@
       "speed_tps": 3.7,
       "bench_score": 0.8,
       "context_length": 16384,
-      "capabilities": ["lesson_review", "kb_audit", "session_summary"],
+      "capabilities": [
+        "lesson_review",
+        "kb_audit",
+        "session_summary"
+      ],
       "layer": 2,
       "docker_extra_args": "--reasoning off",
       "dspy_module": null,
@@ -84,7 +109,12 @@
       "speed_tps": 1.8,
       "bench_score": 0.927,
       "context_length": 16384,
-      "capabilities": ["lesson_review", "kb_audit", "ingestion", "verification"],
+      "capabilities": [
+        "lesson_review",
+        "kb_audit",
+        "ingestion",
+        "verification"
+      ],
       "layer": 3,
       "docker_extra_args": "",
       "dspy_module": null,
@@ -93,22 +123,34 @@
   },
   "routing": {
     "lesson_review": {
-      "pipeline": ["moe35b_triage", "mid_14b", "alpha"],
+      "pipeline": [
+        "moe35b_triage",
+        "mid_14b",
+        "alpha"
+      ],
       "confidence_threshold": 0.9,
       "fallback": "alpha"
     },
     "kb_audit": {
-      "pipeline": ["mid_14b", "alpha"],
+      "pipeline": [
+        "mid_14b",
+        "alpha"
+      ],
       "confidence_threshold": 0.9,
       "fallback": "alpha"
     },
     "dedup": {
-      "pipeline": ["moe35b_triage", "alpha"],
+      "pipeline": [
+        "moe35b_triage",
+        "alpha"
+      ],
       "confidence_threshold": 0.9,
       "fallback": "alpha"
     },
     "ingestion": {
-      "pipeline": ["alpha"],
+      "pipeline": [
+        "alpha"
+      ],
       "confidence_threshold": 1.0,
       "fallback": "alpha"
     },
@@ -118,7 +160,9 @@
       "fallback": null
     },
     "session_summary": {
-      "pipeline": ["mid_14b"],
+      "pipeline": [
+        "mid_14b"
+      ],
       "confidence_threshold": 0.9,
       "fallback": "alpha"
     }
@@ -132,7 +176,7 @@
     "health_check_interval": 5,
     "models_base_dir": "/srv/models",
     "ssh_alias": "furycomai",
-    "gpu_layers": 99,
+    "gpu_layers": "auto",
     "default_ctx_size": 16384,
     "default_threads": 24
   }

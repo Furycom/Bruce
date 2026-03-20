@@ -54,7 +54,7 @@ router.post('/bruce/inbox/ingest', async (req, res) => {
   try {
     const resp = await fetch(RUNNER_URL, {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + (BRUCE_AUTH_TOKEN || 'bruce-secret-token-01'), 'Content-Type': 'application/json' },
+      headers: { 'Authorization': 'Bearer ' + (BRUCE_AUTH_TOKEN || process.env.BRUCE_AUTH_TOKEN), 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(180000)
     });
     const data = await resp.json();

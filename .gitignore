@@ -40,3 +40,4 @@ patch_ssh_keypref.py
 !mcp-gateway/entrypoint.sh
 !mcp-gateway/package.json
 !mcp-gateway/connectors.json
+*.broken*

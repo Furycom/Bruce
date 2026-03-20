@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 DEFAULT_GATEWAY = "http://192.168.2.230:4000"
-DEFAULT_TOKEN = "bruce-secret-token-01"
+DEFAULT_TOKEN = os.environ.get("BRUCE_AUTH_TOKEN", "")
 DEFAULT_SUPABASE_URL = "http://192.168.2.146:8000"
 DEFAULT_SUPABASE_KEY_PATH = "/home/furycom/bruce-config/supabase_key_local.txt"
 HTTP_METHODS = ("get", "post", "put", "patch", "delete")

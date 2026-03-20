@@ -78,7 +78,7 @@ CONFIG: Dict[str, Any] = {
     },
     "llm_status": {
         "url": "http://192.168.2.230:4000/bruce/llm/status",
-        "headers": {"Authorization": "Bearer bruce-secret-token-01"},
+        "headers": {"Authorization": f"Bearer {os.environ.get('BRUCE_AUTH_TOKEN')}"},
     },
     "litellm": {
         "url": "http://192.168.2.32:8000/v1/chat/completions",
@@ -91,8 +91,7 @@ CONFIG: Dict[str, Any] = {
     "supabase": {
         "base_url": "http://192.168.2.146:8000/rest/v1",
         "service_key": (
-            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-            "eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UtZGVtbyIsImlhdCI6MTc3MTQ3MDcyMSwiZXhwIjoxOTI5MTUwNzIxfQ."
+            os.environ.get("SUPABASE_KEY", "")
             "cCJJYdmcVWOV-qTZ8EW3NvqJKhAhvJ4GkWZCyfWyYEg"
         ),
     },

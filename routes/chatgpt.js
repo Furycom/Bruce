@@ -101,7 +101,7 @@ router.post('/bruce/chatgpt', async (req, res) => {
       recent_lessons: `curl -s '${supaBase}/lessons_learned?importance=eq.critical&order=created_at.desc&limit=5' -H 'apikey: ${SUPABASE_KEY}' -H 'Authorization: Bearer ${SUPABASE_KEY}' | python3 -m json.tool`,
       staging_status: `curl -s '${supaBase}/staging_queue?status=eq.pending&order=created_at.desc&limit=5' -H 'apikey: ${SUPABASE_KEY}' -H 'Authorization: Bearer ${SUPABASE_KEY}' | python3 -m json.tool`,
       push_to_staging: `curl -s -X POST '${supaBase}/staging_queue' -H 'apikey: ${SUPABASE_KEY}' -H 'Authorization: Bearer ${SUPABASE_KEY}' -H 'Content-Type: application/json' -d '{"table_cible":"lessons_learned","contenu_json":{"lesson_type":"discovery","lesson_text":"TEXTE_ICI","importance":"normal","confidence_score":0.7,"author_system":"claude","project_scope":"homelab"},"author_system":"claude","notes":"via ChatGPT"}'`,
-      integrity_check: `curl -s ${GATEWAY_PUBLIC_URL}/bruce/integrity -H 'Authorization: Bearer bruce-secret-token-01' | python3 -m json.tool`
+      integrity_check: `curl -s ${GATEWAY_PUBLIC_URL}/bruce/integrity -H 'Authorization: Bearer ${process.env.BRUCE_AUTH_TOKEN}' | python3 -m json.tool`
     };
 
     // Forbidden actions list

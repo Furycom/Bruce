@@ -745,7 +745,7 @@ GOLD_EXAMPLES = [
         text="Déployé en session 1110: endpoint /bruce/llm/status qui retourne en temps réel l'état du LLM local. Informations retournées: health du llama-server, état slot busy/free, n_ctx actuel, task_id en cours, statut LiteLLM, et métriques mesurées (vitesse tokens, TTFT). Utile pour diagnostiquer rapidement si le modèle est disponible avant de lancer un job long.",
         source="Session Opus 1110 - endpoint llm/status",
         lessons_json='[{"lesson_type":"solution","lesson_text":"Endpoint /bruce/llm/status déployé (routes/infra.js): retourne health llama-server, slot busy/free, n_ctx, task_id, statut LiteLLM, métriques vitesse. Diagnostic rapide disponibilité LLM avant job long.","importance":"normal","confidence_score":1.0}]',
-        knowledge_base_json='[{"question":"Comment vérifier si le LLM local est disponible avant de lancer un job?","answer":"GET http://192.168.2.230:4000/bruce/llm/status avec Bearer bruce-secret-token-01. Retourne: health llama-server, slot is_processing, n_ctx, task_id, LiteLLM status, métriques. Vérifier is_processing=false avant de lancer DSPy ou autre job long.","category":"runbook","tags":["llm","status","llama-server","diagnostic"]}]',
+        knowledge_base_json='[{"question":"Comment vérifier si le LLM local est disponible avant de lancer un job?","answer":"GET http://192.168.2.230:4000/bruce/llm/status avec Bearer <BRUCE_AUTH_TOKEN>. Retourne: health llama-server, slot is_processing, n_ctx, task_id, LiteLLM status, métriques. Vérifier is_processing=false avant de lancer DSPy ou autre job long.","category":"runbook","tags":["llm","status","llama-server","diagnostic"]}]',
         decisions_json='[]',
         wishes_json='[]',
         user_profile_json='[]',

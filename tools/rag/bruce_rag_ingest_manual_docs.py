@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 DEFAULT_GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://127.0.0.1:4000")
-DEFAULT_BRUCE_TOKEN = os.environ.get("BRUCE_TOKEN", "bruce-secret-token-01")
+DEFAULT_BRUCE_TOKEN = os.environ.get("BRUCE_TOKEN", "")
 DEFAULT_MANUAL_DIR = os.environ.get("MANUAL_DOCS_DIR", "/home/furycom/manual-docs")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()

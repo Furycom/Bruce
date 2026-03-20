@@ -50,7 +50,7 @@ Scope: `server.js`, `routes/`, `shared/`, and supporting repository structure.
 ## B. Security concerns
 
 1. **Hardcoded secret fallbacks and token literals in code paths and output**.
-   - Default/fallback token strings like `bruce-secret-token-01`, `bruce-litellm-key-01`, `token-abc123` are present in runtime request headers and generated command snippets.
+   - Default/fallback token strings like `<BRUCE_AUTH_TOKEN>`, `bruce-litellm-key-01`, `token-abc123` are present in runtime request headers and generated command snippets.
    - **Action**: fail-closed when required secrets are missing; never embed defaults that look like real credentials.
 
 2. **Sensitive secret leakage risk in `/bruce/chatgpt` response**.

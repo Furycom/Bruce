@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 """
 validate.py v3.4 - [843] Gate-2 vLLM disabled, Gate-1c +4 patterns test-data - [792] Gate roadmap born-done - [677] Checkpoint doc
 Ajouts par rapport à v2.8:
@@ -48,7 +47,7 @@ KNOWN_COLUMNS = {
         "actor","session_id","intent","data_family","canonical_lock","authority_tier","protection_level","project_scope"},
     "knowledge_base": {"question","answer","category","subcategory","tags","author_system",
         "content_hash","validated","confidence_score","actor","session_id",
-        "intent","data_family","canonical_lock","authority_tier","protection_level"},
+        "intent","data_family","canonical_lock","authority_tier","protection_level","project_scope"},
     "current_state": {"key","value","updated_at","data_family","canonical_lock","authority_tier","protection_level"},
     "session_history": {"session_start","session_end","tasks_completed","notes",
         "author_system","content_hash","validated","data_family"},
@@ -61,6 +60,9 @@ KNOWN_COLUMNS = {
         "url","role","notes","trigger_texts","dependencies","inputs","outputs",
         "risks_rollback","vm_parent","data_family","project_scope",
         "author_system","created_at","updated_at"},
+    "user_profile": {"category","subcategory","observation","source","confidence",
+        "date_observed","author_system","content_hash","validated","data_family",
+        "canonical_lock","trait_name","priority","status","updated_at"},
 }
 
 # ==================== [580] GATE 1: VALIDATION STRUCTURELLE ====================
@@ -232,7 +234,8 @@ def post(table, obj, upsert_on=None):
         headers["Prefer"] = f"resolution=merge-duplicates,return=representation"
     r = requests.post(f"{SUPABASE}/{table}", headers=headers, json=obj, timeout=10)
     if r.status_code not in (200, 201):
-        print(f"    [HTTP {r.status_code}] {r.text[:200]}")
+        print(f"    [HTTP {r.status_code}] {r.text[:300]}")
+        print(f"    [PAYLOAD] {str(obj)[:200]}")
     return r.status_code in (200, 201)
 
 def patch(table, filter_, obj):

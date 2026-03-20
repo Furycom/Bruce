@@ -3,7 +3,7 @@
 import time, json, sys, urllib.request, urllib.error
 
 GATEWAY = "http://192.168.2.230:4000"
-TOKEN = "bruce-secret-token-01"
+TOKEN = os.environ.get("BRUCE_AUTH_TOKEN", "")
 HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 
 def post_json(url, payload_dict, timeout=15, max_retries=3):

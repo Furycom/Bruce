@@ -58,7 +58,7 @@ services:
     environment:
       - LITELLM_MASTER_KEY=${BRUCE_LITELLM_KEY:-bruce-litellm-key-01}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-pk-bruce-langfuse-2026}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-sk-bruce-langfuse-2026}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
       - LANGFUSE_HOST=${LANGFUSE_HOST:-http://192.168.2.154:3200}
     command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
     healthcheck:

@@ -26,6 +26,12 @@ const TOPIC_MAPPING = {
   ingestion:  { tool_cats: ['ingestion', 'pipeline', 'indexation'], kb_cats: ['pipeline', 'tools'], kb_tags: ['ingestion', 'embedding', 'rag'] },
   codex:      { tool_cats: ['gateway', 'core'], kb_cats: ['workflow', 'governance'], kb_tags: ['codex', 'github', 'pr'] },
   migration:  { tool_cats: ['maintenance'], kb_cats: ['schema', 'architecture'], kb_tags: ['migration', 'schema'] },
+  screensaver: { tool_cats: ['ai', 'maintenance'], kb_cats: ['architecture', 'governance'], kb_tags: ['screensaver', 'llm', 'batch', 'jobs'] },
+  lightrag:   { tool_cats: ['ai', 'indexation'], kb_cats: ['architecture', 'tools'], kb_tags: ['lightrag', 'graph', 'rag', 'entities'] },
+  llm_jobs:   { tool_cats: ['ai', 'maintenance'], kb_cats: ['architecture', 'pipeline'], kb_tags: ['llm', 'batch', 'jobs', 'screensaver'] },
+  memory:     { tool_cats: ['core'], kb_cats: ['architecture', 'governance'], kb_tags: ['memory', 'bootstrap', 'context', 'tiers'] },
+  general:    { tool_cats: ['core', 'maintenance', 'ai', 'infrastructure'], kb_cats: ['governance', 'architecture', 'runbook'], kb_tags: ['gateway', 'architecture', 'governance', 'bootstrap'] },
+  bootstrap_tier: { tool_cats: ['core', 'session'], kb_cats: ['architecture', 'governance'], kb_tags: ['bootstrap', 'context', 'tiers', 'memory'] },
 };
 
 // Synonyms for topic normalization
@@ -46,6 +52,9 @@ const TOPIC_SYNONYMS = {
   'optimize': 'dspy', mipro: 'dspy',
   bootstrap: 'session',
   audit: 'session', context: 'session',
+  'light-rag': 'lightrag', graph: 'lightrag', graphrag: 'lightrag',
+  screensaver_jobs: 'screensaver', 'llm-jobs': 'llm_jobs', 'batch-jobs': 'llm_jobs',
+  tiers: 'bootstrap_tier', 'context-layer': 'bootstrap_tier', '5-tier': 'bootstrap_tier',
 };
 
 /**

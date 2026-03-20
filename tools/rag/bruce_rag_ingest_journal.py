@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 UUID_NS = uuid.UUID("3b3b0c3b-4c1a-4b1e-9b3e-9c2f3d10a5a1")
 
 DEFAULT_GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://127.0.0.1:4000")
-DEFAULT_BRUCE_TOKEN = os.environ.get("BRUCE_TOKEN", "bruce-secret-token-01")
+DEFAULT_BRUCE_TOKEN = os.environ.get("BRUCE_TOKEN", "")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()

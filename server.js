@@ -43,6 +43,7 @@ const sessionRoutes = require('./routes/session');
 const roadmapRoutes = require('./routes/roadmap');
 const toolsUnlockRoutes = require('./routes/tools-unlock');
 const fileRoutes = require('./routes/file');
+const screensaverRoutes = require('./routes/screensaver');
 
 // ========== SHARED MODULES (C7 refonte) ==========
 const { fetchWithTimeout } = require('./shared/fetch-utils');
@@ -139,6 +140,7 @@ app.use(sessionRoutes);
 app.use(roadmapRoutes);
 app.use(toolsUnlockRoutes);
 app.use(fileRoutes);
+app.use(screensaverRoutes);
 sessionRoutes.setSafePythonSpawn(safePythonSpawn);
 
 // ========== HEALTH ==========

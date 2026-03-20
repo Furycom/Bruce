@@ -112,7 +112,7 @@ Ce fichier documente la configuration complète de Claude Desktop Windows pour r
 
 | Service | Token / Credential | Notes |
 |---------|-------------------|-------|
-| Gateway BRUCE | `bruce-secret-token-01` | Bearer token pour toutes les requêtes gateway .230:4000 |
+| Gateway BRUCE | `<BRUCE_AUTH_TOKEN>` | Bearer token pour toutes les requêtes gateway .230:4000 |
 | LiteLLM | `bruce-litellm-key-01` | Master key LiteLLM .230:4100 |
 | llama-server .32 | `token-abc123` | API key llama.cpp .32:8000 |
 | GitHub API | `<GITHUB_PAT>` | Repo Furycom/Bruce — merge PRs |

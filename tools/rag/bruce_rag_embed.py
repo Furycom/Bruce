@@ -196,7 +196,7 @@ do update set
 def main() -> int:
     parser = argparse.ArgumentParser(description="BRUCE RAG Embedder (Pack B.1)")
     parser.add_argument("--gateway", default=os.environ.get("BRUCE_GATEWAY_URL", "http://127.0.0.1:4000"))
-    parser.add_argument("--token", default=os.environ.get("BRUCE_GATEWAY_TOKEN", "bruce-secret-token-01"))
+    parser.add_argument("--token", default=os.environ.get("BRUCE_GATEWAY_TOKEN", ""))
     parser.add_argument("--embedder", default=os.environ.get("BRUCE_EMBEDDER_URL", "http://192.168.2.85:8081"))
     parser.add_argument("--model", default=os.environ.get("BRUCE_EMBED_MODEL", "BAAI/bge-m3"))
     parser.add_argument("--limit", type=int, default=int(os.environ.get("BRUCE_EMBED_LIMIT", "500")))

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 """
 bruce_ingest.py — Pipeline ingestion BRUCE v2.0
 Architecture: Fichier → Unstructured → TopicSplitter → vLLM → BGE → Supabase staging
@@ -52,6 +51,7 @@ if INSTRUCTOR_AVAILABLE:
         question: str = Field(description="Sujet ou question précise en français")
         answer: str = Field(description="Réponse technique complète et réutilisable (min 60 chars)")
         category: str = Field(description="docker|infrastructure|architecture|runbook|workflow|services|tools|ssh|configuration|debugging|solution-validee|pipeline|api|governance")
+        subcategory: str = Field(description="Sous-catégorie précise (ex: compose, networking, proxmox, backup, monitoring, zigbee, mqtt, ha-automation, prompt-engineering, gateway, embedding, n8n, grafana, loki)")
         tags: list[str] = Field(default_factory=list)
 
     class DecisionItem(BaseModel):
@@ -98,15 +98,85 @@ if INSTRUCTOR_AVAILABLE:
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 SUPABASE_URL = "http://192.168.2.146:8000/rest/v1"
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+SUPABASE_KEY = (
+    os.environ.get("SUPABASE_KEY", "")
+    ".cCJJYdmcVWOV-qTZ8EW3NvqJKhAhvJ4GkWZCyfWyYEg"
+)
 VLLM_URL = "http://192.168.2.230:4100/v1"  # [731] Route via LiteLLM for Langfuse tracing
-VLLM_API_KEY = os.environ.get("BRUCE_LITELLM_KEY", "")  # [731] LiteLLM auth
+VLLM_API_KEY = "bruce-litellm-key-01"  # [731] LiteLLM auth
 GATEWAY_URL = "http://192.168.2.230:4000"
 GATEWAY_TOKEN = os.environ.get("BRUCE_AUTH_TOKEN", "")
 BGE_MODEL = "BAAI/bge-m3"
 CHUNK_SIZE = 1500          # tokens approximatifs (~6000 chars)
 CHUNK_OVERLAP = 200
 AUTHOR_SYSTEM = "bruce-ingest-v2"
+
+# --- SUBCATEGORY FALLBACK [SESSION-1231] ------------------------------------------
+SUBCATEGORY_DEFAULTS = {
+    "docker": "compose",
+    "infrastructure": "proxmox",
+    "architecture": "design",
+    "runbook": "procedure",
+    "workflow": "automation",
+    "services": "deployment",
+    "tools": "cli",
+    "ssh": "ssh-config",
+    "configuration": "config-file",
+    "debugging": "diagnostic",
+    "solution-validee": "fix",
+    "pipeline": "ingestion",
+    "api": "api-gateway",
+    "governance": "policy",
+    "conversation-qa": "general",
+}
+
+SUBCATEGORY_KEYWORDS = {
+    "compose": ["docker-compose", "compose", "docker compose", "service:", "volumes:", "ports:"],
+    "networking": ["proxy", "traefik", "nginx", "port", "reverse proxy", "dns", "ip", "vlan", "firewall"],
+    "proxmox": ["proxmox", "vm ", "lxc", "ct ", "qemu", "pve", "box1", "box2"],
+    "backup": ["backup", "sauvegarde", "restore", "snapshot", "borg", "rsync"],
+    "monitoring": ["grafana", "loki", "prometheus", "alert", "dashboard", "monitoring", "observability"],
+    "zigbee": ["zigbee", "z2m", "zigbee2mqtt", "capteur", "sensor"],
+    "mqtt": ["mqtt", "mosquitto", "broker", "topic", "publish", "subscribe"],
+    "ha-automation": ["home assistant", "ha ", "automation", "blueprint", "trigger", "action"],
+    "prompt-engineering": ["prompt", "few-shot", "instruction", "system prompt", "dspy"],
+    "gateway": ["gateway", "bruce_gateway", "4000", "route", "endpoint"],
+    "embedding": ["embedding", "bge", "vector", "embed", "similarity", "cosine"],
+    "n8n": ["n8n", "workflow", "webhook", "node ", "automation n8n"],
+    "grafana": ["grafana", "dashboard", "panel", "datasource"],
+    "loki": ["loki", "logql", "log ", "logging"],
+    "vllm": ["vllm", "llm", "qwen", "model", "inference", "token", "gpu", "vram"],
+    "supabase": ["supabase", "postgres", "table", "rpc", "staging_queue", "rest api"],
+    "docker-compose": ["docker-compose", "compose file", "docker compose"],
+    "ssh-config": ["ssh", ".ssh", "authorized_keys", "identity", "key", "scp"],
+    "api-gateway": ["api", "rest", "endpoint", "/v1", "bearer", "token"],
+    "validation": ["validate", "validation", "gate-1", "gate-2", "staging", "promote"],
+    "ingestion": ["ingest", "ingestion", "pipeline", "extract", "chunk"],
+    "llm-config": ["temperature", "max_tokens", "model", "llm", "parallel"],
+    "mcp-server": ["mcp", "tool", "claude code", "desktop commander"],
+    "traefik": ["traefik", "reverse proxy", "label", "router", "middleware"],
+    "postgres": ["postgres", "sql", "table", "index", "query", "rpc", "trigger"],
+}
+
+
+def infer_subcategory(category: str, text: str) -> str:
+    """
+    Inf\u00e8re la subcategory depuis category + contenu textuel.
+    Utilis\u00e9 comme fallback quand le LLM ne g\u00e9n\u00e8re pas subcategory.
+    """
+    text_lower = text.lower()
+    best_match = None
+    best_score = 0
+    for subcat, keywords in SUBCATEGORY_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw.lower() in text_lower)
+        if score > best_score:
+            best_score = score
+            best_match = subcat
+    if best_match and best_score >= 1:
+        return best_match
+    return SUBCATEGORY_DEFAULTS.get(category, "general")
+
+
 
 # ─── BEST-OF-N FUSION [OPUS-104] ─────────────────────────────────────────────
 DEFAULT_BON_TEMPERATURES = [0.3, 0.5, 0.7]
@@ -534,7 +604,8 @@ def topic_split(text: str, chunk_size_chars: int = 6000, overlap_chars: int = 40
 
 # ─── COMPOSANT 3 : VLLMExtractor ─────────────────────────────────────────────
 # ─── EXTRACTION PROMPT (DSPy optimisé 68.72% + règles BRUCE) [509] ──────────────
-EXTRACTION_PROMPT = """[DSPy-v2.7] Tu es un extracteur de mémoire pour BRUCE, homelab intelligent de Yann.
+EXTRACTION_PROMPT = """/no_think
+[DSPy-v3.2] Tu es un extracteur de mémoire pour BRUCE, homelab intelligent de Yann.
 Ton objectif: extraire UNIQUEMENT les informations concrètes, spécifiques et actionnables. La qualité prime sur la quantité.
 
 LANGUE: Réponds TOUJOURS en français, sans exception.
@@ -576,6 +647,7 @@ Réponds UNIQUEMENT avec ce JSON valide (pas de markdown, pas dexplication, pas 
       "question": "Sujet ou question précise en français",
       "answer": "Réponse complète et réutilisable en français (min 60 chars). Contexte, détails concrets, pourquoi ce choix.",
       "category": "docker|infrastructure|architecture|runbook|workflow|services|tools|ssh|configuration|debugging|solution-validee|pipeline|api|governance",
+      "subcategory": "OBLIGATOIRE, TOUJOURS remplir. Sous-catégorie précise parmi: compose, networking, proxmox, backup, monitoring, zigbee, mqtt, ha-automation, prompt-engineering, gateway, embedding, n8n, grafana, loki, vllm, supabase, docker-compose, ssh-config, api-gateway, validation, ingestion, llm-config, mcp-server, traefik, postgres",
       "tags": ["tag1", "tag2"]
     }}
   ],
@@ -613,7 +685,7 @@ Réponds UNIQUEMENT avec ce JSON valide (pas de markdown, pas dexplication, pas 
 RÈGLES:
 - TOUT en français
 - lessons: apprentissages, patterns, diagnostics — tout ce qui a de la valeur future
-- knowledge_base: infos techniques réutilisables (configs, outils, patterns, choix architecturaux)
+- knowledge_base: infos techniques réutilisables (configs, outils, patterns, choix architecturaux). OBLIGATOIRE: chaque item KB DOIT avoir un champ subcategory non-vide (ex: compose, networking, proxmox, backup, monitoring, zigbee, mqtt, ha-automation, prompt-engineering, gateway, embedding, n8n, grafana, loki)
 - decisions: décisions explicites de Yann ou principes établis
 - wishes: ce que Yann VEUT, SOUHAITE, AIMERAIT voir dans son homelab
 - user_profile: comment Yann travaille, ce quil valorise, ses préférences révélées
@@ -621,9 +693,16 @@ RÈGLES:
 - importance=critical: MAX 5% des items (seulement décisions architecturales majeures)
 - Si rien dans une catégorie, retourner []
 - Chaque item DOIT être autonome (compréhensible sans la source)
+
+EXEMPLES KB (subcategory OBLIGATOIRE, copier le format):
+  Ex1: {{"question":"Config reverse proxy Traefik pour n8n","answer":"Label traefik.http.routers.n8n.rule=Host(n8n.local) dans docker-compose.yml sur .230.","category":"docker","subcategory":"compose","tags":["traefik","n8n"]}}
+  Ex2: {{"question":"Pourquoi vLLM timeout après 5min","answer":"--max-model-len trop haut (32768) pour la VRAM. Réduit à 8192, résolu.","category":"infrastructure","subcategory":"vllm","tags":["vllm","gpu"]}}
+  Ex3: {{"question":"Validation items staging BRUCE","answer":"validate.py --auto lit staging_queue, applique Gate-1/Gate-2, promeut vers tables canon.","category":"pipeline","subcategory":"validation","tags":["validation"]}}
+  ATTENTION: si subcategory est absent ou vide, l'item sera REJETÉ par le pipeline.
 """
 
-EXTRACTION_PROMPT_ARCHIVE = """Tu es un extracteur de mémoire pour BRUCE, homelab intelligent de Yann.
+EXTRACTION_PROMPT_ARCHIVE = """/no_think
+Tu es un extracteur de mémoire pour BRUCE, homelab intelligent de Yann.
 Tu traites un FICHIER ARCHIVE (conversation ou note ancienne).
 
 RÈGLE FONDAMENTALE: Un désir ancien n'est pas un désir mort.
@@ -677,7 +756,7 @@ RÈGLES STRICTES:
 
 
 # [v2.8] Charger le prompt DSPy optimise si disponible
-_DSPY_PROMPT_PATH = Path("/home/furycom/bruce_optimized_prompt_v27.json")
+_DSPY_PROMPT_PATH = Path("/home/furycom/bruce_optimized_prompt_v32.json")
 _DSPY_OPTIMIZED_INSTRUCTIONS = None
 
 def _load_dspy_prompt():
@@ -722,7 +801,7 @@ def vllm_extract(chunk: dict, source: str, dry_run: bool = False, archive_mode: 
         dspy_instr = _DSPY_OPTIMIZED_INSTRUCTIONS["instructions"]
         dspy_demos = _DSPY_OPTIMIZED_INSTRUCTIONS.get("demos", [])
         demo_text = ""
-        for d in dspy_demos[:2]:  # max 2 demos pour ne pas exploser le contexte
+        for d in dspy_demos[:3]:  # [963] v32 uses 3 few-shot demos  # max 2 demos pour ne pas exploser le contexte
             if d.get("text") and d.get("lessons_json"):
                 demo_text += f"\n---EXEMPLE---\nTexte: {d['text'][:500]}\nLessons: {d.get('lessons_json','[]')}\n"
         prompt = f"{dspy_instr}\n{demo_text}\n\nEXTRAIT A ANALYSER:\n{chunk['text'][:6000]}\n\nSOURCE: {source}\n\n" + EXTRACTION_PROMPT.split("Réponds UNIQUEMENT")[1]
@@ -752,7 +831,7 @@ def _vllm_extract_instructor(chunk: dict, prompt: str, archive_mode: bool, _over
         result_class = ArchiveExtractionResult if archive_mode else ExtractionResult
 
         result = client.chat.completions.create(
-            model="Qwen/Qwen2.5-7B-Instruct",
+            model="qwen3-32b",
             messages=[{"role": "user", "content": prompt}],
             response_model=result_class,
             max_retries=3,
@@ -798,12 +877,12 @@ def _vllm_extract_manual(chunk: dict, prompt: str, _override_temperature: float 
                 f"{VLLM_URL}/chat/completions",
                 headers={"Authorization": f"Bearer {VLLM_API_KEY}"},
                 json={
-                    "model": "Qwen/Qwen2.5-7B-Instruct",
+                    "model": "qwen3-32b",
                     "messages": [{"role": "user", "content": prompt}],
                     "max_tokens": 2000,
                     "temperature": _override_temperature if _override_temperature is not None else 0.1,
                 },
-                timeout=60,
+                timeout=900,
             )
             resp.raise_for_status()
             raw = resp.json()["choices"][0]["message"]["content"].strip()
@@ -1072,10 +1151,17 @@ def run_pipeline(file_path: Path, source: str, dry_run: bool = False, gap_detect
                 disc_tags = disc.get("tags", [])
                 if "archive" not in disc_tags:
                     disc_tags.append("archive")
+                # [SESSION-1231] Subcategory fallback pour discoveries archive
+                disc_category = disc.get("category", "infrastructure")
+                disc_subcategory = disc.get("subcategory", "")
+                if not disc_subcategory or len(str(disc_subcategory).strip()) < 2:
+                    disc_subcategory = infer_subcategory(disc_category, disc.get("question", "") + " " + disc.get("answer", ""))
+
                 kb_payload = {
                     "question": disc.get("question", ""),
                     "answer": disc.get("answer", ""),
-                    "category": disc.get("category", "infrastructure"),
+                    "category": disc_category,
+                    "subcategory": disc_subcategory,
                     "tags": disc_tags[:5],
                     "author_system": AUTHOR_SYSTEM + "-archive",
                     "validated": False,
@@ -1129,10 +1215,18 @@ def run_pipeline(file_path: Path, source: str, dry_run: bool = False, gap_detect
             else:
                 clean_category = raw_category or "infrastructure"
 
+            # [SESSION-1231] Subcategory: récupérer du LLM ou inférer par fallback
+            raw_subcategory = kb.get("subcategory", "")
+            if not raw_subcategory or len(str(raw_subcategory).strip()) < 2:
+                inferred_text = kb.get("question", "") + " " + kb.get("answer", "")
+                raw_subcategory = infer_subcategory(clean_category, inferred_text)
+                print(f"      [SubcatFallback] KB '{kb.get('question', '')[:40]}...' -> subcategory='{raw_subcategory}' (inferred from content)")
+
             kb_payload = {
                 "question": kb.get("question", kb.get("title", "")),
                 "answer": kb.get("answer", kb.get("content", "")),
                 "category": clean_category,
+                "subcategory": raw_subcategory,
                 "tags": kb.get("tags", [])[:5],  # Max 5 tags
                 "author_system": AUTHOR_SYSTEM,
                 "validated": False,
@@ -1183,6 +1277,7 @@ def run_pipeline(file_path: Path, source: str, dry_run: bool = False, gap_detect
                 "question": qa_q,
                 "answer": qa_a,
                 "category": "conversation-qa",
+                "subcategory": infer_subcategory("conversation-qa", qa_q + " " + qa_a),
                 "tags": qa.get("tags", ["conversation"]),
                 "author_system": AUTHOR_SYSTEM,
                 "validated": False,

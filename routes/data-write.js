@@ -73,7 +73,7 @@ router.post('/bruce/write', async (req, res) => {
       try {
         const valRes = await fetchWithTimeout(
           VALIDATE_SERVICE_URL + '/run/validate',
-          { method: 'POST', headers: { 'X-BRUCE-TOKEN': String(process.env.BRUCE_AUTH_TOKEN || 'bruce-secret-token-01') } },
+          { method: 'POST', headers: { 'X-BRUCE-TOKEN': String(process.env.BRUCE_AUTH_TOKEN || process.env.BRUCE_AUTH_TOKEN) } },
           20000
         );
         const valData = await valRes.json();

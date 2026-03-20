@@ -31,7 +31,7 @@ Le fichier contient une structure enveloppe :
       "name": "validate_service",
       "url": "http://172.18.0.1:4001",
       "auth_header": "X-BRUCE-TOKEN",
-      "auth_value": "bruce-secret-token-01"
+      "auth_value": "<BRUCE_AUTH_TOKEN>"
     }
   ]
 }

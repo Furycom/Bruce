@@ -1037,7 +1037,7 @@ router.post('/bruce/session/close', async (req, res) => {
       try {
         const valRes = await fetchWithTimeout(
           VALIDATE_SERVICE_URL + '/run/validate',
-          { method: 'POST', headers: { 'X-BRUCE-TOKEN': (BRUCE_AUTH_TOKEN || 'bruce-secret-token-01'), 'Content-Type': 'application/json' } },
+          { method: 'POST', headers: { 'X-BRUCE-TOKEN': (BRUCE_AUTH_TOKEN || process.env.BRUCE_AUTH_TOKEN), 'Content-Type': 'application/json' } },
           65000
         );
         validateResult = await valRes.json();

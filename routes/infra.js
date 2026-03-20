@@ -473,7 +473,7 @@ router.post('/bruce/bootstrap', async (req, res) => {
   const llmIdentity = MODEL_TO_IDENTITY[model.toLowerCase()] || 'claude';
 
   const hGw = {
-    'Authorization': 'Bearer ' + (BRUCE_AUTH_TOKEN || 'bruce-secret-token-01'),
+    'Authorization': 'Bearer ' + (BRUCE_AUTH_TOKEN || process.env.BRUCE_AUTH_TOKEN),
     'Content-Type': 'application/json',
     'x-llm-identity': llmIdentity  // [CE-2] Forward identity to session/init
   };
