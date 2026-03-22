@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
 import os
 """
-kb_maintenance.py v2 — Job LLM de maintenance avec AUTO-CORRECTION
-Conçu par Claude Opus session 18, v2 par Opus session 92.
+kb_maintenance.py v3 — Job LLM de maintenance avec AUTO-CORRECTION
+Conçu par Claude Opus session 18, v2 par Opus session 92, v3 par Opus session 1242.
 
 MODES:
   --dry-run     Analyse sans écriture (rapport seulement)
   --auto-fix    Applique les corrections automatiques (default pour cron)
   --only X      Exécuter seulement: contradictions|doublons|roadmap
 
-CHANGEMENTS v2 (session Opus 92):
-  - Mode --auto-fix: suppression directe des doublons overlap>=0.8
-  - Doublons 0.35<overlap<0.8: proposés via staging_queue pour review
-  - Contradictions high: staging_queue avec suggestion de résolution
-  - Notification ntfy résumé après chaque run
-  - Protection canonical_lock=true (jamais touchée)
-  - Nettoyage des chunks/embeddings orphelins après suppression
-  - Log structuré de chaque action corrective
+CHANGEMENTS v3 (session Opus 1242):
+  - RÈGLE YANN ABSOLUE: JAMAIS de DELETE. Tout doit être archivé (archived=true)
+  - sb_delete() remplacé par sb_archive() — fait PATCH archived=true
+  - delete_lesson_and_chunks() remplacé par archive_lesson() — archive sans supprimer chunks
+  - Triggers PostgreSQL BEFORE DELETE bloquent tout DELETE sur lessons_learned et knowledge_base
+  - Messages de log mis à jour: "supprimé" → "archivé"
 
 Usage:
   python3 kb_maintenance.py                    # Auto-fix (default)
@@ -41,7 +39,7 @@ NTFY_URL = "http://192.168.2.174:8080/bruce-alerts"
 
 # Seuils
 COSINE_DOUBLON_THRESHOLD = 0.92
-HIGH_OVERLAP_THRESHOLD = 0.80    # v2: auto-suppression au-dessus
+HIGH_OVERLAP_THRESHOLD = 0.80    # v2: auto-archivage au-dessus
 LOW_OVERLAP_THRESHOLD = 0.35     # En dessous = pas un doublon
 CONTRADICTION_BATCH_SIZE = 20
 MAX_LESSONS_PER_TYPE = 50
@@ -101,14 +99,16 @@ def sb_post(table, body):
     t = r.text.strip()
     return json.loads(t) if t else {}
 
-def sb_delete(table, filter_str):
-    """v2: DELETE via Supabase REST API."""
+def sb_archive(table, filter_str):
+    """v3: ARCHIVE via PATCH archived=true — JAMAIS de DELETE (règle Yann absolue).
+    Remplace l'ancien sb_delete(). Un trigger PG BEFORE DELETE bloque aussi côté DB."""
     if DRY_RUN:
-        log(f"  [DRY-RUN] Would DELETE {table}?{filter_str}")
+        log(f"  [DRY-RUN] Would ARCHIVE {table}?{filter_str}")
         return True
-    r = requests.delete(f"{SUPABASE}/{table}?{filter_str}", headers=SB_HEADERS, timeout=15)
+    r = requests.patch(f"{SUPABASE}/{table}?{filter_str}", headers=SB_HEADERS,
+                       json={"archived": True}, timeout=15)
     if r.status_code not in (200, 204):
-        raise RuntimeError(f"DELETE {table}?{filter_str}: {r.status_code} {r.text[:200]}")
+        raise RuntimeError(f"ARCHIVE {table}?{filter_str}: {r.status_code} {r.text[:200]}")
     return True
 
 def sb_patch(table, filter_str, body):
@@ -144,7 +144,7 @@ def ask_llm(system_prompt, user_prompt, max_tokens=500):
         log(f"  LLM ERROR: {e}")
         return None
 
-def push_staging(table, content, author="kb-maintenance-v2"):
+def push_staging(table, content, author="kb-maintenance-v3"):
     """Push un résultat dans staging_queue."""
     if DRY_RUN:
         log(f"  [DRY-RUN] Would stage to {table}: {json.dumps(content, ensure_ascii=False)[:120]}...")
@@ -192,41 +192,24 @@ def content_hash(text):
 
 
 # =============================================================================
-# v2: AUTO-CORRECTION — Suppression doublons et nettoyage chunks
+# v3: ARCHIVAGE — Remplace delete_lesson_and_chunks() de v2
 # =============================================================================
-def delete_lesson_and_chunks(lesson_id, reason):
-    """v2: Supprime une leçon ET ses chunks/embeddings associés."""
-    action_log("delete_lesson", {"lesson_id": lesson_id, "reason": reason})
+def archive_lesson(lesson_id, reason):
+    """v3: Archive une leçon (archived=true) au lieu de la supprimer.
+    Les chunks/embeddings restent liés — ils seront filtrés par les requêtes
+    qui excluent archived=true. JAMAIS de DELETE (règle Yann absolue)."""
+    action_log("archive_lesson", {"lesson_id": lesson_id, "reason": reason})
 
     if DRY_RUN:
         return True
 
     try:
-        # 1. Trouver les chunks liés à cette leçon
-        chunks = sb_get(f"bruce_chunks?select=chunk_id&anchor->>source_id=eq.{lesson_id}&anchor->>source_table=eq.lessons_learned")
-        chunk_ids = [c["chunk_id"] for c in chunks]
-
-        # 2. Supprimer embeddings des chunks trouvés
-        for cid in chunk_ids:
-            try:
-                sb_delete("bruce_embeddings", f"chunk_id=eq.{cid}")
-            except Exception as e:
-                log(f"    Warning: could not delete embedding for chunk {cid}: {e}")
-
-        # 3. Supprimer les chunks
-        for cid in chunk_ids:
-            try:
-                sb_delete("bruce_chunks", f"chunk_id=eq.{cid}")
-            except Exception as e:
-                log(f"    Warning: could not delete chunk {cid}: {e}")
-
-        # 4. Supprimer la leçon
-        sb_delete("lessons_learned", f"id=eq.{lesson_id}")
-
-        log(f"    ✅ Deleted lesson {lesson_id} + {len(chunk_ids)} chunks + embeddings")
+        # Archive la leçon — les chunks/embeddings restent intacts
+        sb_patch("lessons_learned", f"id=eq.{lesson_id}", {"archived": True})
+        log(f"    ✅ Archived lesson {lesson_id} (reason: {reason})")
         return True
     except Exception as e:
-        log(f"    ❌ Failed to delete lesson {lesson_id}: {e}")
+        log(f"    ❌ Failed to archive lesson {lesson_id}: {e}")
         return False
 
 
@@ -236,7 +219,7 @@ def delete_lesson_and_chunks(lesson_id, reason):
 def detect_contradictions():
     log("=== ANALYSE 1: CONTRADICTIONS ===")
 
-    lessons = sb_get("lessons_learned?select=id,lesson_text,lesson_type,importance,confidence_score,canonical_lock&validated=eq.true&order=id.desc&limit=300")
+    lessons = sb_get("lessons_learned?select=id,lesson_text,lesson_type,importance,confidence_score,canonical_lock&validated=eq.true&archived=not.is.true&order=id.desc&limit=300")
     log(f"  {len(lessons)} leçons validées chargées")
 
     by_type = defaultdict(list)
@@ -330,7 +313,7 @@ LEÇON B (id={b['id']}, confiance={b.get('confidence_score',0)}):
                     "category": "maintenance-report",
                     "tags": "contradiction,auto-fix,review-needed",
                     "confidence_score": 0.85
-                }, author="kb-maintenance-v2-autofix")
+                }, author="kb-maintenance-v3-autofix")
                 action_log("stage_contradiction_resolution", {
                     "ids": [c["lesson_a_id"], c["lesson_b_id"]],
                     "severity": c["severity"]
@@ -340,17 +323,17 @@ LEÇON B (id={b['id']}, confiance={b.get('confidence_score',0)}):
 
 
 # =============================================================================
-# ANALYSE 2 : DOUBLONS SÉMANTIQUES — v2 avec auto-suppression
+# ANALYSE 2 : DOUBLONS SÉMANTIQUES — v3 avec auto-archivage (plus de delete)
 # =============================================================================
 def detect_semantic_duplicates():
-    log("=== ANALYSE 2: DOUBLONS SÉMANTIQUES (v2 auto-fix) ===")
+    log("=== ANALYSE 2: DOUBLONS SÉMANTIQUES (v3 auto-archive) ===")
 
-    # Charger TOUTES les leçons validées (pas seulement critical/high)
-    lessons = sb_get("lessons_learned?select=id,lesson_text,lesson_type,importance,confidence_score,canonical_lock,date_learned&validated=eq.true&order=id.desc&limit=500")
+    # Charger TOUTES les leçons validées NON archivées
+    lessons = sb_get("lessons_learned?select=id,lesson_text,lesson_type,importance,confidence_score,canonical_lock,date_learned&validated=eq.true&archived=not.is.true&order=id.desc&limit=500")
     log(f"  {len(lessons)} leçons validées chargées")
 
     duplicates_found = []
-    auto_deleted = 0
+    auto_archived = 0
     staged_for_review = 0
     checked = set()
 
@@ -428,11 +411,11 @@ ENTRÉE B (id={b['id']}, date={b.get('date_learned','?')}):
                     }
                     duplicates_found.append(dup_entry)
 
-                    # v2: AUTO-FIX logic
+                    # v3: AUTO-ARCHIVE logic (was AUTO-DELETE in v2)
                     if AUTO_FIX:
-                        # NEVER delete canonical_lock lessons
+                        # NEVER touch canonical_lock lessons
                         if remove_lesson.get("canonical_lock"):
-                            action_log("skip_delete_locked", {
+                            action_log("skip_archive_locked", {
                                 "id": remove_lesson["id"],
                                 "reason": "canonical_lock=true"
                             })
@@ -441,10 +424,10 @@ ENTRÉE B (id={b['id']}, date={b.get('date_learned','?')}):
                         effective_overlap = max(word_overlap, llm_overlap if isinstance(llm_overlap, (int, float)) else 0)
 
                         if effective_overlap >= HIGH_OVERLAP_THRESHOLD:
-                            # High overlap → auto-delete
-                            log(f"  🗑️  AUTO-DELETE lesson {remove_lesson['id']} (overlap={effective_overlap:.2f}, keep={keep_lesson['id']})")
-                            if delete_lesson_and_chunks(remove_lesson["id"], f"doublon overlap={effective_overlap:.2f} de lesson {keep_lesson['id']}"):
-                                auto_deleted += 1
+                            # High overlap → auto-archive (v3: was auto-delete)
+                            log(f"  📦 AUTO-ARCHIVE lesson {remove_lesson['id']} (overlap={effective_overlap:.2f}, keep={keep_lesson['id']})")
+                            if archive_lesson(remove_lesson["id"], f"doublon overlap={effective_overlap:.2f} de lesson {keep_lesson['id']}"):
+                                auto_archived += 1
                         else:
                             # Medium overlap → stage for review
                             log(f"  📋 STAGE FOR REVIEW: {remove_lesson['id']} ≈ {keep_lesson['id']} (overlap={effective_overlap:.2f})")
@@ -452,12 +435,12 @@ ENTRÉE B (id={b['id']}, date={b.get('date_learned','?')}):
                                 "question": f"Doublon potentiel à vérifier: lessons {keep_lesson['id']} vs {remove_lesson['id']}",
                                 "answer": f"DOUBLON POTENTIEL (overlap={effective_overlap:.2f}):\n"
                                           f"Garder #{keep_lesson['id']}: {keep_lesson['lesson_text'][:150]}\n"
-                                          f"Supprimer? #{remove_lesson['id']}: {remove_lesson['lesson_text'][:150]}\n"
+                                          f"Archiver? #{remove_lesson['id']}: {remove_lesson['lesson_text'][:150]}\n"
                                           f"Raison LLM: {reason}",
                                 "category": "maintenance-report",
                                 "tags": "doublon,review-needed",
                                 "confidence_score": 0.75
-                            }, author="kb-maintenance-v2-autofix")
+                            }, author="kb-maintenance-v3-autofix")
                             staged_for_review += 1
 
                 except (json.JSONDecodeError, KeyError, TypeError) as e:
@@ -467,8 +450,8 @@ ENTRÉE B (id={b['id']}, date={b.get('date_learned','?')}):
                 time.sleep(0.5)
 
     log(f"  {len(checked)} paires vérifiées, {len(duplicates_found)} doublons détectés")
-    log(f"  v2: {auto_deleted} auto-supprimés, {staged_for_review} en attente de review")
-    return duplicates_found, auto_deleted, staged_for_review
+    log(f"  v3: {auto_archived} auto-archivés, {staged_for_review} en attente de review")
+    return duplicates_found, auto_archived, staged_for_review
 
 
 # =============================================================================
@@ -479,7 +462,7 @@ def check_roadmap_coherence():
 
     roadmap = sb_get("roadmap?select=id,step_name,priority,status,description&status=in.(todo,doing)&order=priority.asc")
     roadmap_done = sb_get("roadmap?select=id,step_name,status&status=eq.done&order=id.desc&limit=20")
-    recent_lessons = sb_get("lessons_learned?select=id,lesson_text,lesson_type&validated=eq.true&order=id.desc&limit=50")
+    recent_lessons = sb_get("lessons_learned?select=id,lesson_text,lesson_type&validated=eq.true&archived=not.is.true&order=id.desc&limit=50")
 
     log(f"  {len(roadmap)} tâches todo/doing, {len(roadmap_done)} done récentes, {len(recent_lessons)} leçons récentes")
 
@@ -556,19 +539,19 @@ LEÇONS À ANALYSER:
 
 
 # =============================================================================
-# MAIN — v2: Orchestration, rapport, et notification
+# MAIN — v3: Orchestration, rapport, et notification (archivage au lieu de delete)
 # =============================================================================
-def generate_report(contradictions, duplicates, auto_deleted, staged_review, roadmap_issues, normalize_stats=None):
-    """v2: Rapport enrichi avec actions correctives."""
+def generate_report(contradictions, duplicates, auto_archived, staged_review, roadmap_issues, normalize_stats=None):
+    """v3: Rapport enrichi avec actions correctives (archivage)."""
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     mode = "DRY-RUN" if DRY_RUN else "AUTO-FIX"
 
-    report_parts = [f"RAPPORT MAINTENANCE KB v2 — {timestamp} [{mode}]"]
+    report_parts = [f"RAPPORT MAINTENANCE KB v3 — {timestamp} [{mode}]"]
     report_parts.append("")
     if normalize_stats:
         ns = normalize_stats
-        report_parts.append(f"NORMALIZE [557]: lesson_type={ns.get('lesson_type_fixed',0)}, null_deleted={ns.get('lesson_deleted_null',0)}, kb_cat={ns.get('kb_category_fixed',0)}")
+        report_parts.append(f"NORMALIZE [557]: lesson_type={ns.get('lesson_type_fixed',0)}, null_archived={ns.get('lesson_archived_null',0)}, kb_cat={ns.get('kb_category_fixed',0)}")
         report_parts.append("")
 
     report_parts.append(f"CONTRADICTIONS: {len(contradictions)} détectées")
@@ -578,9 +561,9 @@ def generate_report(contradictions, duplicates, auto_deleted, staged_review, roa
         report_parts.append("  Aucune contradiction détectée.")
 
     report_parts.append("")
-    report_parts.append(f"DOUBLONS: {len(duplicates)} détectés | {auto_deleted} auto-supprimés | {staged_review} en review")
+    report_parts.append(f"DOUBLONS: {len(duplicates)} détectés | {auto_archived} auto-archivés | {staged_review} en review")
     for d in duplicates:
-        status = "SUPPRIMÉ" if d.get("word_overlap", 0) >= HIGH_OVERLAP_THRESHOLD or d.get("llm_overlap", 0) >= HIGH_OVERLAP_THRESHOLD else "REVIEW"
+        status = "ARCHIVÉ" if d.get("word_overlap", 0) >= HIGH_OVERLAP_THRESHOLD or d.get("llm_overlap", 0) >= HIGH_OVERLAP_THRESHOLD else "REVIEW"
         report_parts.append(f"  [{status}] #{d['keep_id']} ← #{d['remove_id']} (overlap={d['word_overlap']}): {d['reason'][:80]}")
     if not duplicates:
         report_parts.append("  Aucun doublon détecté.")
@@ -604,23 +587,23 @@ def generate_report(contradictions, duplicates, auto_deleted, staged_review, roa
 
     # Push rapport dans KB
     push_staging("knowledge_base", {
-        "question": f"Rapport maintenance KB v2 {timestamp}",
+        "question": f"Rapport maintenance KB v3 {timestamp}",
         "answer": report_text,
         "category": "maintenance-report",
-        "tags": "maintenance,automatique,llm,rapport,v2",
+        "tags": "maintenance,automatique,llm,rapport,v3",
         "confidence_score": 0.9
     })
 
     # v2: Notification ntfy
     summary = (
-        f"KB Maintenance v2 [{mode}]\n"
+        f"KB Maintenance v3 [{mode}]\n"
         f"Contradictions: {len(contradictions)}\n"
-        f"Doublons: {len(duplicates)} ({auto_deleted} supprimés, {staged_review} review)\n"
+        f"Doublons: {len(duplicates)} ({auto_archived} archivés, {staged_review} review)\n"
         f"Roadmap: {len(roadmap_issues)} problèmes\n"
         f"Actions: {len(ACTIONS_LOG)}"
     )
-    priority = "high" if auto_deleted > 0 or len(contradictions) > 0 else "default"
-    notify_ntfy("🔧 KB Maintenance v2", summary, priority=priority)
+    priority = "high" if auto_archived > 0 or len(contradictions) > 0 else "default"
+    notify_ntfy("🔧 KB Maintenance v3", summary, priority=priority)
 
     # Validate staging entries
     validate()
@@ -630,8 +613,7 @@ def generate_report(contradictions, duplicates, auto_deleted, staged_review, roa
 
 # =============================================================================
 # MODULE NORMALIZE [557] — Nettoyage déterministe, zero LLM requis
-# Règles: (1) lesson_type pipes -> premier type (2) KB catégories hors-canon -> remap
-#         (3) lesson_text=null -> supprimer avec chunks/embeddings
+# v3: lesson_text=null → archiver au lieu de supprimer
 # =============================================================================
 
 LESSON_TYPES_CANONICAL = {
@@ -668,12 +650,12 @@ KB_CATEGORIES_CANONICAL = {
 def normalize():
     """[557] Normalisation déterministe kb_maintenance — zero LLM."""
     log("=== MODULE NORMALIZE [557] ===")
-    stats = {"lesson_type_fixed": 0, "lesson_deleted_null": 0, "kb_category_fixed": 0}
+    stats = {"lesson_type_fixed": 0, "lesson_archived_null": 0, "kb_category_fixed": 0}
 
     # 1. lesson_type avec pipes -> premier type
     log("  [1/3] lesson_type avec pipes...")
     lessons_pipe = sb_get(
-        "lessons_learned?lesson_type=like.*|*&select=id,lesson_type,canonical_lock&limit=500"
+        "lessons_learned?lesson_type=like.*|*&select=id,lesson_type,canonical_lock&archived=not.is.true&limit=500"
     )
     log(f"    {len(lessons_pipe)} trouvées")
     for lesson in lessons_pipe:
@@ -685,22 +667,22 @@ def normalize():
         stats["lesson_type_fixed"] += 1
     log(f"    ✅ {stats['lesson_type_fixed']} normalisés")
 
-    # 2. lesson_text=null -> supprimer
+    # 2. lesson_text=null -> ARCHIVER (v3: était supprimer en v2)
     log("  [2/3] Leçons lesson_text=null...")
     lessons_null = sb_get(
-        "lessons_learned?lesson_text=is.null&select=id,canonical_lock&limit=200"
+        "lessons_learned?lesson_text=is.null&select=id,canonical_lock&archived=not.is.true&limit=200"
     )
     log(f"    {len(lessons_null)} trouvées")
     for lesson in lessons_null:
         if lesson.get("canonical_lock"):
             continue
-        delete_lesson_and_chunks(lesson["id"], "lesson_text=null")
-        stats["lesson_deleted_null"] += 1
-    log(f"    ✅ {stats['lesson_deleted_null']} supprimées")
+        archive_lesson(lesson["id"], "lesson_text=null")
+        stats["lesson_archived_null"] += 1
+    log(f"    ✅ {stats['lesson_archived_null']} archivées")
 
     # 3. Catégories KB hors-canonique -> remap
     log("  [3/3] Catégories KB hors-mapping...")
-    kb_all = sb_get("knowledge_base?select=id,category,canonical_lock&limit=1000")
+    kb_all = sb_get("knowledge_base?select=id,category,canonical_lock&archived=not.is.true&limit=1000")
     for kb in kb_all:
         cat = kb.get("category", "")
         if not cat or kb.get("canonical_lock"):
@@ -722,17 +704,18 @@ def normalize():
 
 
 def main():
-    log("=== KB MAINTENANCE v2 JOB START ===")
+    log("=== KB MAINTENANCE v3 JOB START ===")
     log(f"Config: DRY_RUN={DRY_RUN}, AUTO_FIX={AUTO_FIX}, ONLY={ONLY}")
     log(f"Seuils: HIGH_OVERLAP={HIGH_OVERLAP_THRESHOLD}, LOW_OVERLAP={LOW_OVERLAP_THRESHOLD}")
     log(f"vLLM: {VLLM_MODEL} @ {VLLM_BASE}")
+    log(f"v3: JAMAIS de DELETE — archivage uniquement (règle Yann)")
 
     # Test vLLM connectivity
     try:
         test = ask_llm("Réponds OK.", "Test de connectivité.", max_tokens=10)
         if not test:
             log("ERREUR: vLLM ne répond pas. Abandon.")
-            notify_ntfy("❌ KB Maintenance v2", "vLLM ne répond pas — job abandonné", priority="high")
+            notify_ntfy("❌ KB Maintenance v3", "vLLM ne répond pas — job abandonné", priority="high")
             sys.exit(1)
         log(f"  vLLM OK: '{test[:30]}'")
     except Exception as e:
@@ -741,7 +724,7 @@ def main():
 
     contradictions = []
     duplicates = []
-    auto_deleted = 0
+    auto_archived = 0
     staged_review = 0
     roadmap_issues = []
     normalize_stats = {}
@@ -753,14 +736,14 @@ def main():
         contradictions = detect_contradictions()
 
     if ONLY is None or ONLY == "doublons":
-        duplicates, auto_deleted, staged_review = detect_semantic_duplicates()
+        duplicates, auto_archived, staged_review = detect_semantic_duplicates()
 
     if ONLY is None or ONLY == "roadmap":
         roadmap_issues = check_roadmap_coherence()
 
-    report = generate_report(contradictions, duplicates, auto_deleted, staged_review, roadmap_issues, normalize_stats)
+    report = generate_report(contradictions, duplicates, auto_archived, staged_review, roadmap_issues, normalize_stats)
 
-    log("=== KB MAINTENANCE v2 JOB TERMINÉ ===")
+    log("=== KB MAINTENANCE v3 JOB TERMINÉ ===")
     return report
 
 

@@ -56,9 +56,6 @@ const BRUCE_SSH_KEY_PATH =
 const DEFAULT_BRUCE_SSH_HOSTS = {
   '192.168.2.32': { user: 'furycom', label: 'dell-7910' },
   '192.168.2.87': { user: 'yann', label: 'box2-edge' },
-  '192.168.2.103': { user: 'root', label: 'pve-hypervisor' },
-  '192.168.2.113': { user: 'yann', label: 'box2-docs' },
-  '192.168.2.123': { user: 'yann', label: 'box2-media' },
   '192.168.2.146': { user: 'furycom', label: 'furysupa' },
   '192.168.2.154': { user: 'yann', label: 'box2-observability' },
   '192.168.2.173': { user: 'yann', label: 'box2-tube' },
@@ -66,7 +63,8 @@ const DEFAULT_BRUCE_SSH_HOSTS = {
   '192.168.2.85': { user: 'furycom', label: 'embedder' },
   '192.168.2.231': { user: 'furycom', label: 'furycom-231' },
   '192.168.2.230': { user: 'furycom', label: 'gateway-host' },
-  '192.168.2.249': { user: 'yann', label: 'box2-secrets' },
+  '192.168.2.249': { user: 'furycom', label: 'box2-secrets' },
+  '192.168.2.103': { user: 'root', label: 'pve-hypervisor' },
 };
 
 let BRUCE_SSH_HOSTS = DEFAULT_BRUCE_SSH_HOSTS;

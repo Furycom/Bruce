@@ -1,0 +1,110 @@
+# ============================================================
+# Playbook: validate-staging
+# Description: Quand staging_queue contient des entrées non validées,
+#              le 32B lance la validation et rapporte les résultats.
+# Version: 1.1
+# ============================================================
+
+name: validate-staging
+version: "1.1"
+description: >
+  Vérifie les entrées en staging_queue (lessons_learned ou knowledge_base
+  en attente de validation). Pour chaque entrée, appelle le endpoint
+  /bruce/integrity ou le script validate.py, puis patche le statut.
+
+trigger:
+  type: polling
+  interval_seconds: 300
+  condition:
+    # Le runner vérifie cette condition avant d'exécuter les steps
+    type: supabase_count
+    table: staging_queue
+    filters:
+      status: "eq.pending"
+    min_count: 1
+
+context:
+  # Variables injectées dans les steps
+  supabase_url: "http://192.168.2.146:8000/rest/v1"
+  gateway_url: "http://192.168.2.230:4000"
+  validate_url: "http://192.168.2.230:4000"
+  batch_size: 10
+
+steps:
+  - id: fetch_pending
+    action: supabase_get
+    params:
+      table: staging_queue
+      filters:
+        status: "eq.pending"
+      select: "id,table_cible,contenu_json,author_system,created_at,status"
+      order: "created_at.asc"
+      limit: 10
+    output: pending_items
+
+  - id: check_empty
+    action: guard
+    condition: "len(pending_items) > 0"
+    on_false: exit_ok
+    message: "Aucune entrée en staging — rien à faire."
+
+  - id: validate_batch
+    action: http_post
+    params:
+      url: "{{ context.validate_url }}/bruce/integrity"
+      headers:
+        Authorization: "Bearer bruce-secret-token-01"
+        Content-Type: "application/json"
+      body:
+        items: "{{ pending_items }}"
+    output: validation_results
+    on_error: retry
+
+  - id: apply_results
+    action: for_each
+    collection: "{{ validation_results.results }}"
+    as: result
+    steps:
+      - id: patch_staging
+        action: supabase_patch
+        params:
+          table: staging_queue
+          match:
+            id: "{{ result.id }}"
+          patch:
+            status: "{{ result.status }}"
+            validated_at: "{{ now_iso }}"
+            notes: "{{ result.reason }}"
+
+      - id: notify_if_rejected
+        action: guard
+        condition: "result.status == 'rejected'"
+        on_false: continue
+        steps:
+          - action: log
+            params:
+              level: warning
+              message: "Entrée rejetée id={{ result.id }} reason={{ result.reason }}"
+
+  - id: report
+    action: log
+    params:
+      level: info
+      message: >
+        validate-staging terminé: {{ len(validation_results.results) }} entrées traitées,
+        {{ count_by(validation_results.results, 'status', 'approved') }} approuvées,
+        {{ count_by(validation_results.results, 'status', 'rejected') }} rejetées.
+
+success_criteria:
+  - all_items_patched: true
+  - no_unhandled_errors: true
+
+fallback:
+  on_error: log_and_skip
+  max_retries: 2
+  retry_delay_seconds: 30
+  escalation:
+    action: log
+    params:
+      level: error
+      message: "validate-staging en échec après retries — escalade requise."

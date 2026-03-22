@@ -1,0 +1,136 @@
+# ============================================================
+# Playbook: session-summary
+# Description: Après chaque session Claude, génère un résumé
+#              structuré des leçons et décisions de la session.
+# Version: 1.0
+# ============================================================
+
+name: session-summary
+version: "1.0"
+description: >
+  Détecte les sessions Claude sans résumé dans session_history,
+  collecte les leçons associées, et génère un résumé structuré
+  via le 32B.
+
+trigger:
+  type: polling
+  interval_seconds: 600
+  condition:
+    type: supabase_count
+    table: session_history
+    filters:
+      notes: "is.null"
+    min_count: 1
+
+context:
+  supabase_url: "http://192.168.2.146:8000/rest/v1"
+  litellm_url: "http://192.168.2.230:4100/v1/chat/completions"
+  gateway_url: "http://192.168.2.230:4000"
+  max_lessons_per_session: 500
+  batch_size: 1
+
+steps:
+  - id: fetch_pending_sessions
+    action: supabase_get
+    params:
+      table: session_history
+      filters:
+        notes: "is.null"
+      select: "id,created_at"
+      order: "created_at.asc"
+      limit: "{{ context.batch_size }}"
+    output: pending_sessions
+
+  - id: check_empty
+    action: guard
+    condition: "len(pending_sessions) > 0"
+    on_false: exit_ok
+    message: "Toutes les sessions ont un résumé."
+
+  - id: process_session
+    action: for_each
+    collection: "{{ pending_sessions }}"
+    as: session
+    steps:
+      - id: fetch_lessons
+        action: supabase_get
+        params:
+          table: lessons_learned
+          filters:
+            session_id: "eq.{{ session.id }}"
+          select: "id,lesson_text,importance,lesson_type,created_at"
+          order: "created_at.asc"
+          limit: "{{ context.max_lessons_per_session }}"
+        output: session_lessons
+
+      - id: check_has_lessons
+        action: guard
+        condition: "len(session_lessons) > 0"
+        on_false: mark_empty
+        steps:
+          - id: patch_no_lessons
+            action: supabase_patch
+            params:
+              table: session_history
+              match:
+                id: "{{ session.id }}"
+              patch:
+                notes: "Session sans leçons enregistrées."
+
+      - id: llm_summarize
+        action: llm_call
+        params:
+          url: "{{ context.litellm_url }}"
+          model: "alpha"
+          prompt: |
+            /no_think
+            Tu es BRUCE session analyst. Résume cette session Claude à partir
+            des leçons apprises. Produis un résumé structuré.
+
+            SESSION: {{ session.id }}
+            DATE: {{ session.created_at }}
+            LEÇONS ({{ len(session_lessons) }}):
+            {{ json_dumps(session_lessons) }}
+
+            Retourne un JSON strict:
+            {
+              "summary": "3-5 phrases résumant la session: objectifs, décisions clés, résultats",
+              "key_decisions": ["décision 1", "décision 2"],
+              "topics": ["topic1", "topic2"],
+              "lessons_count": N,
+              "critical_lessons": [ids des leçons critiques]
+            }
+          max_tokens: 500
+        output: summary_result
+
+      - id: patch_summary
+        action: supabase_patch
+        params:
+          table: session_history
+          match:
+            id: "{{ session.id }}"
+          patch:
+            notes: "{{ summary_result.summary }}"
+
+      - id: log_session
+        action: log
+        params:
+          level: info
+          message: >
+            session-summary: session={{ session.id }}
+            lessons={{ len(session_lessons) }}
+            topics={{ summary_result.topics }}
+
+success_criteria:
+  - all_sessions_patched: true
+  - no_unhandled_errors: true
+
+fallback:
+  on_error: log_and_skip
+  max_retries: 2
+  retry_delay_seconds: 30
+  escalation:
+    action: log
+    params:
+      level: error
+      message: "session-summary en échec — vérifier accès Supabase et LLM."

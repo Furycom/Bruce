@@ -41,3 +41,31 @@ patch_ssh_keypref.py
 !mcp-gateway/package.json
 !mcp-gateway/connectors.json
 *.broken*
+
+# === ADDED BY SESSION 1243 - Git sync audit ===
+
+# Model files (too large for Git)
+*.gguf
+*.ggml
+*.bin
+*.safetensors
+
+# Secrets and tokens
+*_key*
+*secret*
+*token*
+cloudflared/config/
+
+# DSPy cache and temp results
+.dspy_cache/
+dspy_results_*/
+*.lock
+
+# Large result directories (track summary JSON only)
+bench_results/
+bench_results_v2/
+bench_results_v3/
+
+# OS files
+.DS_Store
+Thumbs.db

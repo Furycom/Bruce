@@ -1,0 +1,147 @@
+# ============================================================
+# Playbook: alert-digest
+# Description: Résume les alertes Prometheus/Grafana des dernières 24h
+#              et génère un digest structuré.
+# Version: 1.0
+# ============================================================
+
+name: alert-digest
+version: "1.0"
+description: >
+  Collecte les alertes Prometheus des dernières 24h, les résume
+  via le 32B, et stocke un digest dans la KB ou le rapport.
+
+trigger:
+  type: cron
+  schedule: "0 6 * * *"  # Chaque matin à 6h
+
+context:
+  prometheus_url: "http://192.168.2.230:9090"
+  grafana_url: "http://192.168.2.230:3001"
+  gateway_url: "http://192.168.2.230:4000"
+  litellm_url: "http://192.168.2.230:4100/v1/chat/completions"
+  supabase_url: "http://192.168.2.146:8000/rest/v1"
+  lookback_hours: 24
+  report_table: "lessons_learned"  # playbook_reports n'existe pas
+
+steps:
+  - id: fetch_prometheus_alerts
+    action: http_get
+    params:
+      url: "{{ context.prometheus_url }}/api/v1/alerts"
+    output: prom_alerts
+    on_error: log_and_continue
+
+  - id: fetch_firing_alerts
+    action: filter
+    collection: "{{ prom_alerts.data.alerts | default([]) }}"
+    condition: "item.state == 'firing' or days_since(item.activeAt) < 1"
+    output: recent_alerts
+
+  - id: fetch_prom_targets
+    action: http_get
+    params:
+      url: "{{ context.prometheus_url }}/api/v1/targets"
+    output: prom_targets
+    on_error: log_and_continue
+
+  - id: count_unhealthy_targets
+    action: filter
+    collection: "{{ prom_targets.data.activeTargets | default([]) }}"
+    condition: "item.health != 'up'"
+    output: unhealthy_targets
+
+  - id: build_alert_context
+    action: template
+    template: |
+      ALERTES ACTIVES (dernières {{ context.lookback_hours }}h):
+      {% for alert in recent_alerts %}
+      - {{ alert.labels.alertname }}: {{ alert.annotations.summary | default(alert.labels.instance) }}
+        Sévérité: {{ alert.labels.severity | default('unknown') }}
+        Depuis: {{ alert.activeAt }}
+      {% endfor %}
+
+      TARGETS EN ERREUR:
+      {% for target in unhealthy_targets %}
+      - {{ target.labels.job }}/{{ target.labels.instance }}: {{ target.health }} — {{ target.lastError }}
+      {% endfor %}
+    output: alert_context
+
+  - id: llm_summarize
+    action: llm_call
+    params:
+      url: "{{ context.litellm_url }}"
+      model: "alpha"
+      prompt: |
+        /no_think
+        Tu es BRUCE alert analyst. Analyse ces alertes homelab des dernières 24h
+        et produis un digest structuré.
+
+        {{ alert_context }}
+
+        Retourne un JSON strict:
+        {
+          "summary": "1-2 phrases résumant l'état général",
+          "critical_items": [{"alert": "nom", "action_suggested": "que faire"}],
+          "resolved_count": N,
+          "firing_count": N,
+          "health_score": 0-100,
+          "recommendations": ["suggestion 1", "suggestion 2"]
+        }
+      max_tokens: 800
+    output: digest
+
+  - id: save_digest
+    action: supabase_insert
+    params:
+      table: "{{ context.report_table }}"
+      payload:
+        lesson_type: "playbook_report"
+        lesson_text: "alert-digest {{ today_iso }}: {{ digest.summary }}. Firing={{ digest.firing_count }} Health={{ digest.health_score }}"
+        importance: "normal"
+        author_system: "playbook-alert-digest"
+        data_family: "canonical"
+        project_scope: "homelab"
+        validated: true
+        confidence_score: 1.0
+
+  - id: notify_if_critical
+    action: guard
+    condition: "len(digest.critical_items) > 0"
+    on_false: continue
+    steps:
+      - id: send_critical_alert
+        action: gateway_notify
+        params:
+          url: "{{ context.gateway_url }}/bruce/write"
+          payload:
+            table_cible: "knowledge_base"
+            contenu_json:
+              category: "alert"
+              subcategory: "critical_digest"
+              question: "Alertes critiques {{ today_iso }}"
+              answer: "{{ digest.summary }}. Actions: {{ digest.critical_items }}"
+
+  - id: log_digest
+    action: log
+    params:
+      level: info
+      message: >
+        alert-digest: health={{ digest.health_score }}
+        firing={{ digest.firing_count }}
+        critical={{ len(digest.critical_items) }}
+        unhealthy_targets={{ len(unhealthy_targets) }}
+
+success_criteria:
+  - digest_saved: true
+  - no_unhandled_errors: true
+
+fallback:
+  on_error: log_and_continue
+  max_retries: 1
+  retry_delay_seconds: 60
+  escalation:
+    action: log
+    params:
+      level: error
+      message: "alert-digest échoué — Prometheus ou Grafana peut-être down."

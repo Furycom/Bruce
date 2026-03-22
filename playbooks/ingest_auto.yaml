@@ -1,0 +1,149 @@
+# ============================================================
+# Playbook: ingest-auto
+# Description: Surveille le dossier inbox pour de nouveaux fichiers,
+#              lance l'ingestion automatique via bruce_screensaver.
+# Version: 1.0
+# ============================================================
+
+name: ingest-auto
+version: "1.0"
+description: >
+  Quand un nouveau fichier apparaît dans /home/furycom/inbox/,
+  lance le job d'ingestion du screensaver (ou le fait manuellement
+  via les APIs si le screensaver est occupé).
+
+trigger:
+  type: polling
+  interval_seconds: 120
+  condition:
+    type: directory_watch
+    path: "/home/furycom/inbox"
+    pattern: "*.txt,*.md,*.json,*.pdf,*.csv"
+    min_files: 1
+
+context:
+  inbox_path: "/home/furycom/inbox"
+  done_path: "/home/furycom/inbox/done"
+  rejected_path: "/home/furycom/inbox/rejected"
+  supabase_url: "http://192.168.2.146:8000/rest/v1"
+  gateway_url: "http://192.168.2.230:4000"
+  litellm_url: "http://192.168.2.230:4100/v1/chat/completions"
+  chunk_chars: 4000
+  max_files_per_run: 3
+  reject_after_failures: 3
+
+steps:
+  - id: list_inbox
+    action: list_files
+    params:
+      path: "{{ context.inbox_path }}"
+      pattern: "*.txt,*.md,*.json,*.pdf,*.csv"
+      exclude_dirs: true
+      limit: "{{ context.max_files_per_run }}"
+    output: inbox_files
+
+  - id: check_empty
+    action: guard
+    condition: "len(inbox_files) > 0"
+    on_false: exit_ok
+    message: "Inbox vide — rien à ingérer."
+
+  - id: check_llm_idle
+    action: http_get
+    params:
+      url: "{{ context.litellm_url | replace('/v1/chat/completions', '/health') }}"
+    output: llm_health
+    on_error: exit_error
+
+  - id: process_files
+    action: for_each
+    collection: "{{ inbox_files }}"
+    as: file
+    max_parallel: 1
+    steps:
+      - id: read_file
+        action: read_file
+        params:
+          path: "{{ file.path }}"
+          max_bytes: 1048576
+        output: file_content
+
+      - id: check_readable
+        action: guard
+        condition: "len(file_content.strip()) > 0"
+        on_false: reject_file
+        steps:
+          - id: reject_empty
+            action: move_file
+            params:
+              source: "{{ file.path }}"
+              destination: "{{ context.rejected_path }}/{{ file.name }}"
+            on_error: continue
+
+      - id: chunk_content
+        action: chunk_text
+        params:
+          text: "{{ file_content }}"
+          chunk_size: "{{ context.chunk_chars }}"
+        output: chunks
+
+      - id: process_chunks
+        action: for_each
+        collection: "{{ chunks }}"
+        as: chunk
+        steps:
+          - id: extract_knowledge
+            action: llm_call
+            params:
+              url: "{{ context.litellm_url }}"
+              model: "alpha"
+              prompt: |
+                /no_think
+                Tu es BRUCE ingestion engine. Extrais les connaissances structurées de ce texte.
+                Retourne un JSON strict avec:
+                - "lessons": [{"lesson_text": "...", "lesson_type": "observation|technique|decision", "importance": "critical|high|normal|low"}]
+                - "kb_entries": [{"question": "...", "answer": "...", "category": "...", "subcategory": "..."}]
+
+                TEXTE:
+                {{ chunk }}
+              max_tokens: 2200
+            output: extracted
+            on_error: increment_failure
+
+          - id: post_extracted
+            action: gateway_write
+            params:
+              url: "{{ context.gateway_url }}/bruce/write"
+              payload:
+                table_cible: "knowledge_base"
+                contenu_json: "{{ extracted }}"
+                source_file: "{{ file.name }}"
+
+      - id: move_done
+        action: move_file
+        params:
+          source: "{{ file.path }}"
+          destination: "{{ context.done_path }}/{{ file.name }}"
+
+  - id: log_result
+    action: log
+    params:
+      level: info
+      message: "ingest-auto: traité {{ len(inbox_files) }} fichiers."
+
+success_criteria:
+  - all_files_moved: true
+  - no_unhandled_errors: true
+
+fallback:
+  on_error: log_and_skip
+  max_retries: 2
+  retry_delay_seconds: 30
+  per_file_failure:
+    max_failures: "{{ context.reject_after_failures }}"
+    action: move_to_rejected
+  escalation:
+    action: log
+    params:
+      level: error
+      message: "ingest-auto en échec — fichiers restants dans inbox."

@@ -1,0 +1,135 @@
+# ============================================================
+# Playbook: kb-health
+# Description: Audit périodique de la Knowledge Base — détecte les
+#              doublons, entrées obsolètes, catégories manquantes.
+# Version: 1.0
+# ============================================================
+
+name: kb-health
+version: "1.0"
+description: >
+  Audit de santé de la KB Supabase. Vérifie la cohérence des données :
+  doublons sémantiques, entrées sans catégorie/tags, entrées anciennes
+  jamais revues, distribution des catégories. Génère un rapport.
+
+trigger:
+  type: cron
+  schedule: "0 3 * * *"  # Tous les jours à 3h du matin
+
+context:
+  supabase_url: "http://192.168.2.146:8000/rest/v1"
+  gateway_url: "http://192.168.2.230:4000"
+  litellm_url: "http://192.168.2.230:4100/v1/chat/completions"
+  embedder_url: "http://192.168.2.230:4000/bruce/embeddings"
+  dedup_similarity_threshold: 0.92
+  stale_days: 90
+  max_check_batch: 50
+  report_table: "lessons_learned"  # playbook_reports n'existe pas, on utilise lessons_learned
+
+steps:
+  - id: fetch_stats
+    action: supabase_get
+    params:
+      table: knowledge_base
+      filters:
+        validated: "eq.true"
+      select: "id,question,category,subcategory,tags,created_at"
+      order: "created_at.desc"
+      limit: 50
+    output: kb_entries
+
+  - id: check_missing_metadata
+    action: filter
+    collection: "{{ kb_entries }}"
+    condition: "item.category is None or item.category == '' or item.tags is None or item.tags == '[]'"
+    output: missing_metadata
+
+  - id: check_stale_entries
+    action: filter
+    collection: "{{ kb_entries }}"
+    condition: "days_since(item.created_at) > context.stale_days"
+    output: stale_entries
+
+  - id: check_duplicates
+    action: dedup_scan
+    params:
+      items: "{{ kb_entries }}"
+      text_field: "question"
+      embedder_url: "{{ context.embedder_url }}"
+      threshold: "{{ context.dedup_similarity_threshold }}"
+    output: duplicate_pairs
+
+  - id: category_distribution
+    action: group_count
+    collection: "{{ kb_entries }}"
+    field: "category"
+    output: category_counts
+
+  - id: build_report
+    action: template
+    template: |
+      # KB Health Report — {{ today_iso }}
+
+      ## Résumé
+      - Entrées analysées: {{ len(kb_entries) }}
+      - Métadonnées manquantes: {{ len(missing_metadata) }}
+      - Entrées obsolètes (>{{ context.stale_days }}j): {{ len(stale_entries) }}
+      - Paires de doublons potentiels: {{ len(duplicate_pairs) }}
+
+      ## Métadonnées manquantes
+      {% for item in missing_metadata %}
+      - [{{ item.id }}] {{ item.question[:80] }} — cat={{ item.category or 'VIDE' }}
+      {% endfor %}
+
+      ## Entrées obsolètes
+      {% for item in stale_entries %}
+      - [{{ item.id }}] {{ item.question[:80] }} — créé={{ item.created_at }}
+      {% endfor %}
+
+      ## Doublons potentiels
+      {% for pair in duplicate_pairs %}
+      - [{{ pair.id_a }}] vs [{{ pair.id_b }}] — sim={{ pair.similarity }}
+      {% endfor %}
+
+      ## Distribution catégories
+      {% for cat, count in category_counts.items() %}
+      - {{ cat }}: {{ count }}
+      {% endfor %}
+    output: report_markdown
+
+  - id: save_report
+    action: supabase_insert
+    params:
+      table: "{{ context.report_table }}"
+      payload:
+        lesson_type: "playbook_report"
+        lesson_text: "{{ report_markdown }}"
+        importance: "normal"
+        author_system: "playbook-kb-health"
+        data_family: "canonical"
+        project_scope: "homelab"
+        validated: true
+        confidence_score: 1.0
+
+  - id: log_summary
+    action: log
+    params:
+      level: info
+      message: >
+        kb-health: checked={{ len(kb_entries) }}
+        missing_meta={{ len(missing_metadata) }}
+        stale={{ len(stale_entries) }}
+        dupes={{ len(duplicate_pairs) }}
+
+success_criteria:
+  - report_saved: true
+  - no_unhandled_errors: true
+
+fallback:
+  on_error: log_and_continue
+  max_retries: 1
+  retry_delay_seconds: 60
+  escalation:
+    action: gateway_notify
+    params:
+      message: "kb-health audit échoué — vérifier logs."

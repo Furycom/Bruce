@@ -1,0 +1,201 @@
+{
+  "version": "3.0",
+  "description": "Gold set for temp_gold_14b_v3 review pipeline (20 examples)",
+  "created": "2026-03-22",
+  "examples": [
+    {
+      "id": 1495,
+      "type": "rule_canon",
+      "topic": "Promise.allSettled health checks",
+      "importance": "medium",
+      "expected_review": "keep",
+      "expected_importance": "medium",
+      "confidence": 0.92
+    },
+    {
+      "id": 808,
+      "type": "rule_canon",
+      "topic": "OPUS model_hint strategy",
+      "importance": "critical",
+      "expected_review": "keep",
+      "expected_importance": "critical",
+      "confidence": 0.95
+    },
+    {
+      "id": 1404,
+      "type": "rule_canon",
+      "topic": "stopping after each task for Yann validation",
+      "importance": "critical",
+      "expected_review": "keep",
+      "expected_importance": "critical",
+      "confidence": 0.95
+    },
+    {
+      "id": 9004,
+      "type": "solution",
+      "topic": "docker compose restart not rereading .env",
+      "importance": "high",
+      "expected_review": "keep",
+      "expected_importance": "high",
+      "improved_text": true,
+      "confidence": 0.93
+    },
+    {
+      "id": 1415,
+      "type": "rule_canon",
+      "topic": "bruce_embeddings schema requiring model and dims",
+      "importance": "high",
+      "expected_review": "keep",
+      "expected_importance": "high",
+      "confidence": 0.92
+    },
+    {
+      "id": 9008,
+      "type": "solution",
+      "topic": "DSPy v28 timeout with Qwen 7B",
+      "importance": "critical",
+      "expected_review": "archive",
+      "expected_importance": "low",
+      "reason": "obsolete",
+      "confidence": 0.88
+    },
+    {
+      "id": 1418,
+      "type": "rule_canon",
+      "topic": "session end presenting 3 options to Yann",
+      "importance": "critical",
+      "expected_review": "keep",
+      "expected_importance": "critical",
+      "confidence": 0.95
+    },
+    {
+      "id": 2372,
+      "type": "rule_canon",
+      "topic": "never inventing architecture",
+      "importance": "critical",
+      "expected_review": "keep",
+      "expected_importance": "critical",
+      "confidence": 0.95
+    },
+    {
+      "id": 9014,
+      "type": "solution",
+      "topic": "vllm serve Qwen2.5-7B",
+      "importance": "high",
+      "expected_review": "archive",
+      "expected_importance": "low",
+      "reason": "obsolete",
+      "confidence": 0.90
+    },
+    {
+      "id": 9015,
+      "type": "discovery",
+      "topic": "orphan chunks needing reembedding",
+      "importance": "normal",
+      "expected_review": "keep",
+      "expected_importance": "normal",
+      "improved_text": true,
+      "confidence": 0.90
+    },
+    {
+      "id": 9016,
+      "type": "solution",
+      "topic": "Ollama Qwen 2.5 8B",
+      "importance": "normal",
+      "expected_review": "archive",
+      "expected_importance": "low",
+      "reason": "obsolete",
+      "confidence": 0.92
+    },
+    {
+      "id": 1555,
+      "type": "discovery",
+      "topic": "PostgREST is.null filter returning 400",
+      "importance": "normal",
+      "expected_review": "keep",
+      "expected_importance": "normal",
+      "confidence": 0.90
+    },
+    {
+      "id": 9050,
+      "type": "solution",
+      "topic": "SCP direct for deploying to .230",
+      "importance": "high",
+      "expected_review": "keep",
+      "expected_importance": "high",
+      "confidence": 0.92
+    },
+    {
+      "id": 9051,
+      "type": "solution",
+      "topic": "installing vLLM for Qwen2-7B",
+      "importance": "high",
+      "expected_review": "archive",
+      "expected_importance": "low",
+      "reason": "obsolete",
+      "confidence": 0.90
+    },
+    {
+      "id": 9052,
+      "type": "rule_canon",
+      "topic": "gateway /bruce/write format",
+      "importance": "high",
+      "expected_review": "keep",
+      "expected_importance": "high",
+      "confidence": 0.93
+    },
+    {
+      "id": 9053,
+      "type": "solution",
+      "topic": "Ollama dolphin-mistral-7b",
+      "importance": "normal",
+      "expected_review": "archive",
+      "expected_importance": "low",
+      "reason": "obsolete",
+      "confidence": 0.92
+    },
+    {
+      "id": 9054,
+      "type": "discovery",
+      "topic": "cron screensaver overlap needing PID lockfile",
+      "importance": "normal",
+      "expected_review": "keep",
+      "expected_importance": "normal",
+      "confidence": 0.88
+    },
+    {
+      "id": 9011,
+      "type": "solution",
+      "topic": "backfill_session_id.py",
+      "importance": "normal",
+      "expected_review": "keep",
+      "expected_importance": "normal",
+      "improved_text": true,
+      "confidence": 0.90
+    },
+    {
+      "id": 317,
+      "type": "user_wish",
+      "topic": "clarifications_pending table",
+      "importance": "normal",
+      "expected_review": "keep",
+      "expected_importance": "normal",
+      "reason": "user wish protected by MoE",
+      "confidence": 0.95
+    },
+    {
+      "id": 9055,
+      "type": "solution",
+      "topic": "ollama codellama:7b",
+      "importance": "normal",
+      "expected_review": "archive",
+      "expected_importance": "low",
+      "reason": "obsolete",
+      "confidence": 0.90
+    }
+  ],
+  "total_examples": 20,
+  "keep_count": 15,
+  "archive_count": 5,
+  "avg_confidence": 0.915
+}
