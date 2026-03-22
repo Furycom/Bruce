@@ -6,7 +6,7 @@ const WHITELIST = [
   // Docker (read-only)
   /^docker\s+(ps|logs|inspect|stats|images|top|port|diff)\b/,
   /^docker\s+compose\s+(ps|logs|config)\b/,
-  // [1237] Docker (write-controlled) — needed for node_exporter deployment etc.
+  // [1237] Docker (write-controlled)
   /^docker\s+run\s/,
   /^docker\s+pull\s/,
   /^docker\s+compose\s+(up|down|restart|pull)\b/,
@@ -14,36 +14,46 @@ const WHITELIST = [
   /^docker\s+kill\s+-s\s+SIG(HUP|TERM|USR1)\s/,
   // [1237] Docker update (resource limits)
   /^docker\s+update\s/,
-  // Filesystem read (cat, head, tail, wc, ls, find, stat, du, file)
+  // [1242] Docker rm (cleanup orphelins)
+  /^docker\s+rm\s/,
+  // Filesystem read
   /^(cat|head|tail|wc|ls|find|stat|du|file)\b/,
-  // System info (df, free, uptime, hostname, whoami, uname, lsb_release, id, date)
+  // System info
   /^(df|free|uptime|hostname|whoami|uname|lsb_release|id|date)\b/,
-  // Process inspection (pgrep, ps, top -bn1, pidof)
+  // Process inspection
   /^(pgrep|pidof)\b/,
   /^ps\s+(aux|ef|--no-headers)\b/,
   /^top\s+-bn1\b/,
-  // Service status (read-only systemctl)
-  /^systemctl\s+(status|is-active|is-enabled|list-units|show)\b/,
+  // [1242] Process control (kill screensaver, pkill)
+  /^kill\s/,
+  /^pkill\s/,
+  // Service management (read + stop/start for screensaver control)
+  /^systemctl\s+(status|is-active|is-enabled|list-units|show|stop|start|restart|disable|enable)\b/,
+  /^systemctl\s+--user\s+(status|stop|start|restart|disable|enable)\b/,
   /^journalctl\s/,
-  // Network read (ip, ss, netstat)
+  // Network read
   /^(ip\s+(a|addr|r|route|link)|ss\s|netstat\s)/,
   // Curl (safe fetches)
   /^curl\s+-s\b/,
   // User scripts
   /^\/home\/furycom\/scripts\//,
   /^\.\/bruce_/,
-  // Grep/awk/sed read-only (no -i for sed)
+  // Grep/awk/sed read-only
   /^(grep|egrep|awk)\b/,
-  /^sed\s+(-n\s+)?['"]?[0-9]/,  // sed with line numbers only, not sed -i
-  // [1237] tee for writing config files via SSH (needed for prometheus.yml etc.)
+  /^sed\s+(-n\s+)?['"]?[0-9]/,
+  // [1237] tee, cp, mkdir
   /^tee\s/,
-  // [1237] cp for file operations
   /^cp\s/,
-  // [1237] mkdir for directory creation
   /^mkdir\s/,
-  // [1237] Proxmox VM management (RAM redistribution)
+  // [1237] Proxmox VM management
   /^pct\s+(set|status|list|config)\b/,
   /^qm\s+(set|status|list|config|start|stop)\b/,
+  // [1115] Python/pip for DSPy ingestion
+  /^python3\s/,
+  /^pip\s/,
+  /^\/home\/furycom\/venv-ingestion\/bin\/(python3|pip)\s/,
+  // [1115] sudo apt install (package management)
+  /^sudo\s+apt\s+(install|update|list)\b/,
 ];
 
 // ── Blacklist: patterns interdits (regex) ──
@@ -53,33 +63,26 @@ const BLACKLIST = [
   /dd\s+if=/,
   />\s*\/dev\/sd/,
   /chmod\s+777\b/,
-  // [1237] Only block bare system-level shutdown/reboot, not qm subcommands
   /^(shutdown|reboot|poweroff)\b/,
   /init\s+[06]/,
-  // [995] && autorise si chaque partie passe la whitelist individuellement
-  /\|.*\|/,                        // double pipe interdit (single pipe OK)
-  /;\s*rm\b/,                      // injection via ;
-  /`/,                             // backtick injection
-  /\$\(/,                          // command substitution
-  /\\"/,                           // guillemets imbriqués
-  /sed\s+-i\b/,                    // in-place edit forbidden
-  />\s/,                           // output redirect forbidden
-  />>/,                            // append redirect forbidden
-  // [1237] Docker security: block dangerous docker commands
-  /docker\s+run\s+.*--privileged\b/,     // no privileged containers
-  /docker\s+(rmi|system\s+prune|volume\s+rm)\b/, // no destructive docker ops
+  /\|.*\|/,
+  /;\s*rm\b/,
+  /`/,
+  /\$\(/,
+  /\\"/,
+  /sed\s+-i\b/,
+  />\s/,
+  />>/,
+  /docker\s+run\s+.*--privileged\b/,
+  /docker\s+(rmi|system\s+prune|volume\s+rm)\b/,
+  // [1242] Block kill -9 (too aggressive) but allow kill -TERM and kill PID
+  /kill\s+-9\b/,
 ];
 
-/**
- * Validates whether an exec command is allowed using blacklist and whitelist rules.
- * @param {string} cmd - Raw shell command to validate.
- * @returns {{ allowed: boolean, reason?: string }} Validation result with an optional deny reason.
- */
 function validateExecCommand(cmd) {
   const trimmed = (cmd || '').trim();
   if (!trimmed) return { allowed: false, reason: 'Empty command' };
 
-  // [995] Handle && chaining: split and validate each part independently
   if (/&&/.test(trimmed)) {
     const parts = trimmed.split(/\s*&&\s*/);
     for (const part of parts) {
@@ -91,14 +94,12 @@ function validateExecCommand(cmd) {
     return { allowed: true };
   }
 
-  // Check blacklist first (higher priority)
   for (const pat of BLACKLIST) {
     if (pat.test(trimmed)) {
       return { allowed: false, reason: `Blocked by blacklist: ${pat}` };
     }
   }
 
-  // Check whitelist
   for (const pat of WHITELIST) {
     if (pat.test(trimmed)) {
       return { allowed: true };
@@ -108,11 +109,7 @@ function validateExecCommand(cmd) {
   return { allowed: false, reason: 'Command not in whitelist' };
 }
 
-/**
- * Writes an exec audit entry to Supabase in fire-and-forget mode.
- */
 function auditLog(endpoint, caller, host, cmd, result, durationMs) {
-  // DISABLED: table bruce_audit_log inexistante/vidée, voir [840].
   return;
 }
 

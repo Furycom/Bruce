@@ -33,7 +33,7 @@ MAX_TOKENS    = 2000
 TIMEOUT_SEC   = 600
 CTX_SIZE      = 16384
 
-RESULTS_DIR   = "/home/furycom/dspy_results_v32"
+RESULTS_DIR   = "/workspace/dspy-results/v32"
 LOG_FILE      = f"{RESULTS_DIR}/bench_v32.log"
 PROGRESS_FILE = "/tmp/dspy_v32_progress.json"
 LOCK_FILE     = "/tmp/dspy_v32.lock"

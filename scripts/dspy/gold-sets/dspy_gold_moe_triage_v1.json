@@ -1,0 +1,22 @@
+[
+  {"id": 1404, "lesson_text": "REGLE YANN: S arreter apres chaque tache et attendre validation.", "importance": "critical", "expected_action": "keep", "reason": "Regle Yann sacree"},
+  {"id": 1411, "lesson_text": "Max 1-2 etapes par cycle puis STOP documenter attendre.", "importance": "critical", "expected_action": "keep", "reason": "Regle Yann sacree"},
+  {"id": 2883, "lesson_text": "Editer server.js en live cause crash-loops. Stopper container avant.", "importance": "critical", "expected_action": "keep", "reason": "Piege operationnel actif"},
+  {"id": 2884, "lesson_text": "Git commit mcp-stack avant de fermer session.", "importance": "critical", "expected_action": "keep", "reason": "Regle gouvernance"},
+  {"id": 2888, "lesson_text": "Gate-2 abandonnee. Pipeline: staging Gate-1 Gate-1c Gate-3 canon.", "importance": "critical", "expected_action": "keep", "reason": "Architecture actuelle"},
+  {"id": 3295, "lesson_text": "Verifier constantes version DSPy avant run.", "importance": "critical", "expected_action": "keep", "reason": "Piege DSPy recurrent"},
+  {"id": 3291, "lesson_text": "Wrapper bash v2 watchdog retries bloques redemarrer llama-server.", "importance": "critical", "expected_action": "keep", "reason": "Infra DSPy active"},
+  {"id": 2882, "lesson_text": "Session/close echoue sans evidence.", "importance": "high", "expected_action": "keep", "reason": "Bug actif"},
+  {"id": 2889, "lesson_text": "RAG Tiering: 606 chunks archives, base active reduite.", "importance": "high", "expected_action": "keep", "reason": "Architecture active"},
+  {"id": 3267, "lesson_text": "Fix OOM langfuse-clickhouse: docker update memory 2g.", "importance": "high", "expected_action": "keep", "reason": "Solution operationnelle"},
+  {"id": 2516, "lesson_text": "Inventaire physique obsolete mentionne vLLM.", "importance": "high", "expected_action": "archive", "reason": "Deja corrige"},
+  {"id": 3268, "lesson_text": "PULSE_SYNC: lightrag container.", "importance": "normal", "expected_action": "archive", "reason": "Bruit auto-decouverte"},
+  {"id": 3269, "lesson_text": "PULSE_SYNC: lightrag-db container.", "importance": "normal", "expected_action": "archive", "reason": "Bruit auto-decouverte"},
+  {"id": 3270, "lesson_text": "PULSE_SYNC: embed-adapter container.", "importance": "normal", "expected_action": "archive", "reason": "Bruit auto-decouverte"},
+  {"id": 3271, "lesson_text": "PULSE_SYNC: forgejo container.", "importance": "normal", "expected_action": "archive", "reason": "Bruit auto-decouverte"},
+  {"id": 2891, "lesson_text": "PULSE_SYNC: litellm container.", "importance": "normal", "expected_action": "archive", "reason": "Bruit auto-decouverte"},
+  {"id": 2901, "lesson_text": "PULSE_SYNC: vaultwarden container.", "importance": "normal", "expected_action": "archive", "reason": "Bruit auto-decouverte"},
+  {"id": 1422, "lesson_text": "CLEANUP SUPABASE PHASE 1 DONE.", "importance": "low", "expected_action": "archive", "reason": "Action ponctuelle completee"},
+  {"id": 1489, "lesson_text": "Taches auto-extraites ChatGPT verifier manuellement.", "importance": "low", "expected_action": "keep", "reason": "Regle gouvernance valide"},
+  {"id": 1401, "lesson_text": "Session 74 est Opus pas Sonnet.", "importance": "medium", "expected_action": "archive", "reason": "Correction ponctuelle"}
+]

@@ -1,0 +1,12 @@
+[
+  {"session_id": 1076, "notes": "P2: Postgres MCP instable, Docker TCP 2375, mcp-shell 7681. Context Engine deploye.", "expected_summary": "Session ops/securite: Context Engine deploye, 3 P2 ouvertes.", "expected_tags": ["context-engine", "pipeline", "securite"]},
+  {"session_id": 26, "notes": "HANDOFF OPUS: Source verite=Supabase unique. NEXUS=obsolete.", "expected_summary": "Handoff Opus: Supabase source verite unique, NEXUS retire.", "expected_tags": ["handoff", "supabase", "nettoyage"]},
+  {"session_id": 1080, "notes": "RESTART CLAUDE DESKTOP requis pour n8n-mcp. Backup Supabase via n8n. 509 done.", "expected_summary": "Activation n8n-mcp, backup Supabase. 509 taches completees.", "expected_tags": ["n8n", "backup", "securite"]},
+  {"session_id": 1085, "notes": "ZERO P1/P2. P3: Loki, node-exporter, Gitea, tokens.", "expected_summary": "Zero urgences. 4 P3 identifiees.", "expected_tags": ["cleanup", "p3"]},
+  {"session_id": 1087, "notes": "ZERO P1-P4. 11 P5 projets futurs. Forgejo .230:3300.", "expected_summary": "Backlog vide P1-P4. 11 P5 futurs. Forgejo ok.", "expected_tags": ["backlog-vide", "p5"]},
+  {"session_id": 27, "notes": "HANDOFF SONNET: Base propre. NEXT: gating, format resume, embed_worker.", "expected_summary": "Handoff Sonnet: 3 priorites staging/embed.", "expected_tags": ["handoff", "staging"]},
+  {"session_id": 28, "notes": "embed_worker tmux embed .230. NEXT: agents staging, indexation, RAG.", "expected_summary": "embed_worker actif. Next: staging agents, RAG test.", "expected_tags": ["embed", "rag"]},
+  {"session_id": 30, "notes": "lessons=244 KB=249 done:29 backlog:4 staging=1 conflit.", "expected_summary": "Etat: 244 lessons, 249 KB, 1 conflit staging.", "expected_tags": ["etat", "conflit"]},
+  {"session_id": 1084, "notes": "P2: bind mount server.js, tmux systemd. P3: cadvisor, Gitea, Proxmox.", "expected_summary": "2 P2 levier, 3 P3. Tout Opus.", "expected_tags": ["p2", "systemd"]},
+  {"session_id": 1083, "notes": "P2: Docker TCP 2375, mcp-shell 7681. Tester backup n8n round-trip.", "expected_summary": "2 P2 securite. Test backup n8n requis.", "expected_tags": ["securite", "backup"]}
+]

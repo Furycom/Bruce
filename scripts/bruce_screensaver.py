@@ -110,6 +110,7 @@ CONFIG: Dict[str, Any] = {
         "inbox_dir": "/home/furycom/inbox",
         "inbox_done_dir": "/home/furycom/inbox/done",
         "inbox_rejected_dir": "/home/furycom/inbox/rejected",
+        "stop_flag_file": "/home/furycom/mcp-stack/screensaver_stop.flag",
     },
     "llm_status": {
         "url": "http://192.168.2.230:4000/bruce/llm/status",
@@ -1623,6 +1624,16 @@ def run_cycle() -> str:
 def main_loop() -> None:
     busy_backoff = CONFIG["sleep"]["busy_retry"]  # [1039] starts at base 60s
     while True:
+        # [1242] Stop-flag: if file exists, exit gracefully
+        if os.path.exists(CONFIG["paths"]["stop_flag_file"]):
+            log("SYSTEM", logging.WARNING,
+                "[1242] Stop flag detected — exiting gracefully")
+            try:
+                os.remove(CONFIG["paths"]["stop_flag_file"])
+            except OSError:
+                pass
+            release_lock()
+            sys.exit(0)
         result = run_cycle()
         if result == "done":
             if busy_backoff != CONFIG["sleep"]["busy_retry"]:

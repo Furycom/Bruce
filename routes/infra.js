@@ -749,7 +749,15 @@ router.post('/bruce/context/fetch', async (req, res) => {
  * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
  * @returns {Promise<void>|void} Sends the HTTP JSON response.
  */
+// === /bruce/llm/status — Real-time LLM monitoring [1100] FIXED: parallel + 5s global timeout ===
+/**
+ * Handles GET /bruce/llm/status.
+ * [1100] FIX: All checks run in parallel with a strict 5s global timeout.
+ * Previously sequential calls could sum up to 18s if llama-server was busy.
+ * Now returns partial result with timeout flag if no response within 5s.
+ */
 router.get('/bruce/llm/status', async (req, res) => {
+  const GLOBAL_TIMEOUT_MS = 5000;
   const startMs = Date.now();
   const result = {
     ok: true,
@@ -760,77 +768,105 @@ router.get('/bruce/llm/status', async (req, res) => {
     measured: { loading_time_s: 2, speed_tps: 2.5, ttft_ms: 4000, notes: 'Qwen3-32B Q4 ctx=16384 on Dell 7910' }
   };
 
-  // 1. Check llama-server health + slots
-  try {
-    const healthResp = await fetchWithTimeout(LOCAL_LLM_URL + '/health', { method: 'GET' }, 5000);
-    if (healthResp.ok) {
-      const hData = await healthResp.json();
-      result.llama_server.status = hData.status || 'ok';
-    } else {
-      result.llama_server.status = 'unhealthy_' + healthResp.status;
-    }
-  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
-    result.llama_server.status = 'down';
-    result.llama_server.error = String(e.message || e).substring(0, 100);
-  }
-
-  // 2. Check slots (model loaded, busy/free)
-  try {
-    const slotResp = await fetchWithTimeout(LOCAL_LLM_URL + '/slots', {
-      method: 'GET',
-      headers: { 'Authorization': 'Bearer token-abc123' }
-    }, 5000);
-    if (slotResp.ok) {
-      const slots = await slotResp.json();
-      if (slots && slots.length > 0) {
-        const s = slots[0];
-        result.llama_server.slot_busy = !!s.is_processing;
-        result.llama_server.n_ctx = s.n_ctx || null;
-        result.llama_server.task_id = s.id_task || null;
-        if (s.is_processing) {
-          result.llama_server.tokens_decoded = s.n_decoded || null;
-          result.llama_server.tokens_remaining = s.n_remaining || null;
+  // [1100] Run ALL checks in parallel, wrapped in a global timeout
+  const checksPromise = Promise.allSettled([
+    // 1. llama-server /health
+    (async () => {
+      try {
+        const healthResp = await fetchWithTimeout(LOCAL_LLM_URL + '/health', { method: 'GET' }, 4000);
+        if (healthResp.ok) {
+          const hData = await healthResp.json();
+          result.llama_server.status = hData.status || 'ok';
+        } else {
+          result.llama_server.status = 'unhealthy_' + healthResp.status;
         }
+      } catch (e) {
+        result.llama_server.status = 'down';
+        result.llama_server.error = String(e.message || e).substring(0, 100);
       }
-    }
-  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
-    console.error('[infra.js][/bruce/llm/status] erreur silencieuse:', e.message || e);
-  }
+    })(),
 
-  // 3. Get model name from /props
-  try {
-    const propsResp = await fetchWithTimeout(LOCAL_LLM_URL + '/props', {
-      method: 'GET',
-      headers: { 'Authorization': 'Bearer token-abc123' }
-    }, 3000);
-    if (propsResp.ok) {
-      const props = await propsResp.json();
-      result.llama_server.model = props.default_generation_settings?.model || null;
-    }
-  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
-    console.error('[infra.js][/bruce/llm/status] erreur silencieuse:', e.message || e);
-  }
+    // 2. llama-server /slots
+    (async () => {
+      try {
+        const slotResp = await fetchWithTimeout(LOCAL_LLM_URL + '/slots', {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer token-abc123' }
+        }, 4000);
+        if (slotResp.ok) {
+          const slots = await slotResp.json();
+          if (slots && slots.length > 0) {
+            const s = slots[0];
+            result.llama_server.slot_busy = !!s.is_processing;
+            result.llama_server.n_ctx = s.n_ctx || null;
+            result.llama_server.task_id = s.id_task || null;
+            if (s.is_processing) {
+              result.llama_server.tokens_decoded = s.n_decoded || null;
+              result.llama_server.tokens_remaining = s.n_remaining || null;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[infra.js][/bruce/llm/status] slots check failed:', e.message || e);
+      }
+    })(),
 
-  // 4. Check LiteLLM
-  try {
-    const liteResp = await fetchWithTimeout(LITELLM_URL + '/health/liveliness', { method: 'GET' }, 3000);
-    result.litellm.status = liteResp.ok ? 'ok' : 'down';
-  } catch (_) { console.error(`[infra.js] operation failed:`, _.message);
-    result.litellm.status = 'down';
-  }
+    // 3. llama-server /props (model name)
+    (async () => {
+      try {
+        const propsResp = await fetchWithTimeout(LOCAL_LLM_URL + '/props', {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer token-abc123' }
+        }, 3000);
+        if (propsResp.ok) {
+          const props = await propsResp.json();
+          result.llama_server.model = props.default_generation_settings?.model || null;
+        }
+      } catch (e) {
+        console.error('[infra.js][/bruce/llm/status] props check failed:', e.message || e);
+      }
+    })(),
 
-  // 5. Check if DSPy job is running (read progress file via simple heuristic)
-  // We check if the progress file was updated recently
+    // 4. LiteLLM liveliness
+    (async () => {
+      try {
+        const liteResp = await fetchWithTimeout(LITELLM_URL + '/health/liveliness', { method: 'GET' }, 3000);
+        result.litellm.status = liteResp.ok ? 'ok' : 'down';
+      } catch (_) {
+        result.litellm.status = 'down';
+      }
+    })(),
+
+    // 5. DSPy job progress (local file check)
+    (async () => {
+      try {
+        const { execSync } = require('child_process');
+        const progJson = execSync('cat /tmp/dspy_progress.json 2>/dev/null || echo "{}"', { timeout: 2000 }).toString().trim();
+        const prog = JSON.parse(progJson || '{}');
+        if (prog.timestamp && (Date.now() / 1000 - prog.timestamp) < 3600) {
+          result.dspy_job.running = true;
+          result.dspy_job.progress = prog;
+        }
+      } catch (e) {
+        console.error('[infra.js][/bruce/llm/status] dspy check failed:', e.message || e);
+      }
+    })()
+  ]);
+
+  // [1100] Global timeout: if checks dont finish in 5s, return partial result with timeout flag
   try {
-    const { execSync } = require('child_process');
-    const progJson = execSync('cat /tmp/dspy_progress.json 2>/dev/null || echo "{}"', { timeout: 2000 }).toString().trim();
-    const prog = JSON.parse(progJson || '{}');
-    if (prog.timestamp && (Date.now() / 1000 - prog.timestamp) < 3600) {
-      result.dspy_job.running = true;
-      result.dspy_job.progress = prog;
+    await Promise.race([
+      checksPromise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('global_timeout')), GLOBAL_TIMEOUT_MS))
+    ]);
+  } catch (e) {
+    // Timeout reached — return whatever we have so far
+    if (result.llama_server.status === 'unknown') {
+      result.llama_server.error = 'timeout';
     }
-  } catch (e) { console.error(`[infra.js] operation failed:`, e.message);
-    console.error('[infra.js][/bruce/llm/status] erreur silencieuse:', e.message || e);
+    result.ok = false;
+    result.timeout = true;
+    result.error = 'LLM status check timed out after ' + GLOBAL_TIMEOUT_MS + 'ms';
   }
 
   result.elapsed_ms = Date.now() - startMs;

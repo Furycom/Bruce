@@ -3,7 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Python3 pour scripts maintenance, curl pour healthcheck
-RUN apk add --no-cache python3 curl
+RUN apk add --no-cache python3 curl openssh-client
 
 # Dependances (depuis mcp-gateway/)
 COPY mcp-gateway/package.json mcp-gateway/package-lock.json ./

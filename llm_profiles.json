@@ -168,7 +168,7 @@
     }
   },
   "swap_config": {
-    "docker_container_name": "llama-server",
+    "docker_container_name": "llama-qwen32b",
     "docker_image": "ghcr.io/ggml-org/llama.cpp:server-cuda",
     "base_docker_args": "--gpus all -p 8000:8080 --restart unless-stopped",
     "health_check_url": "http://192.168.2.32:8000/health",
