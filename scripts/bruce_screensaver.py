@@ -661,7 +661,7 @@ def check_idle() -> bool:
         return False
 
 
-def llm_call(job: str, prompt: str, max_tokens: int) -> Optional[Any]:
+def llm_call(job: str, prompt: str, max_tokens: int, context: Optional[str] = None) -> Optional[Any]:
     if not prompt.startswith("/no_think"):
         log(job, logging.ERROR, "Prompt missing /no_think")
         return None
@@ -669,7 +669,7 @@ def llm_call(job: str, prompt: str, max_tokens: int) -> Optional[Any]:
     if PIPELINE_ENABLED and _pipeline is not None:
         started = time.time()
         log(job, logging.INFO, f"[PIPELINE] Routing task_type={job} prompt_len={len(prompt)}")
-        result = _pipeline.execute(job, prompt, max_tokens=max_tokens)
+        result = _pipeline.execute(job, prompt, max_tokens=max_tokens, context=context)
         elapsed = round(time.time() - started, 2)
         if result is not None:
             log(job, logging.INFO, f"[PIPELINE] Success model={_pipeline.get_current_model()} elapsed={elapsed}s")
@@ -948,7 +948,7 @@ def job_lesson_review() -> str:
 
     rows_by_id = {r["id"]: r for r in rows}
     ctx = fetch_dynamic_context("lesson_review")
-    result = llm_call(job, PROMPTS["lesson_review"].replace("{dynamic_context}", ctx).replace("{batch}", format_lessons_batch(rows)), 1200)
+    result = llm_call(job, PROMPTS["lesson_review"].replace("{dynamic_context}", ctx).replace("{batch}", format_lessons_batch(rows)), 1200, context=ctx)
     if not result or "reviews" not in result:
         STATE.setdefault("skip_offset", {})[job] = STATE.get("skip_offset", {}).get(job, 0) + CONFIG["batch_sizes"]["lesson_review"]
         log(job, logging.WARNING, f"Skip offset now {STATE['skip_offset'][job]}")
@@ -1055,7 +1055,7 @@ def job_kb_audit() -> str:
     rows_by_id = {r["id"]: r for r in rows}
     ctx = fetch_dynamic_context("kb_audit")
     prompt = PROMPTS["kb_audit"].replace("{dynamic_context}", ctx).replace("{batch}", format_kb_batch(rows))
-    result = llm_call(job, prompt, 800)
+    result = llm_call(job, prompt, 800, context=ctx)
 
     # [1045] Robust parsing with regex fallback and retry
     if not result or "reviews" not in result:
@@ -1071,7 +1071,7 @@ def job_kb_audit() -> str:
                 log(job, logging.WARNING,
                     f"[1045] Retrying kb_audit with shorter batch: {len(short_rows)}/{len(rows)} items")
                 short_prompt = PROMPTS["kb_audit"].replace("{dynamic_context}", ctx).replace("{batch}", format_kb_batch(short_rows))
-                result = llm_call(job, short_prompt, 800)
+                result = llm_call(job, short_prompt, 800, context=ctx)
                 if result and "reviews" in result:
                     rows = short_rows
                     rows_by_id = {r["id"]: r for r in rows}

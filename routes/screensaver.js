@@ -144,7 +144,7 @@ router.post('/bruce/screensaver/context', async function(req, res) {
       '- Write-path: POST /bruce/write -> staging_queue -> validate.py -> canonical REST. PAS PostgREST direct.',
       '- Bootstrap: claude.md v7.1 -> Memory MCP -> POST /bruce/bootstrap -> context_prompt + context.',
       '- SSH: TOUJOURS via alias (furymcp, furycomai, furysupa), JAMAIS IP directe.',
-      '- LLM multi-modele: 35B-MoE (triage+dedup), 9B (review), 14B (session_summary), 32B Alpha (ingestion+kb_audit).',
+      '- LLM multi-modele: MoE35B (triage+dedup+lesson_review DSPy 100%), 14B (kb_audit DSPy 97%), 32B Alpha (lesson_review+ingestion+session_summary+kb_audit fallback). 9B review ABANDONNE.',
       '',
       jobRules,
     ].join('\n');

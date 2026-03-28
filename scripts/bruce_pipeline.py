@@ -8,6 +8,7 @@ bruce_screensaver.py with minimal changes.
 
 Session 1231 — 2026-03-20
 [1054] Fix claim logic — TTL expiry + screensaver self-bypass (Session 1237)
+[1122][1124] DSPy module integration + context passthrough (Session 1242)
 """
 
 from __future__ import annotations
@@ -46,6 +47,24 @@ LLM_HEADERS = {
 LLM_TIMEOUT = 450
 
 HTTP = requests.Session()
+
+# [1122] DSPy lazy-load cache
+_dspy_modules_cache: Dict[str, Any] = {}
+_dspy_available: Optional[bool] = None
+
+
+def _check_dspy_available() -> bool:
+    """[1122] Check if dspy is installed. Cached after first check."""
+    global _dspy_available
+    if _dspy_available is None:
+        try:
+            import dspy
+            _dspy_available = True
+            LOGGER.info("[1122] DSPy library available (version: %s)", getattr(dspy, '__version__', 'unknown'))
+        except ImportError:
+            _dspy_available = False
+            LOGGER.info("[1122] DSPy library not installed — raw LLM only")
+    return _dspy_available
 
 
 def load_profiles(path=PROFILES_PATH):
@@ -280,7 +299,8 @@ class Pipeline:
         LOGGER.error("Swap to %s FAILED after %.1fs", model_key, duration)
         return False
 
-    def execute(self, task_type, prompt, *, max_tokens=1200, temperature=0):
+    def execute(self, task_type, prompt, *, max_tokens=1200, temperature=0, context=None):
+        """[1122] Added context= parameter for DSPy module passthrough."""
         target_model = self._router.route(task_type)
         LOGGER.info("execute: task=%s model=%s current=%s", task_type, target_model, self._state.current_model)
         if self._is_claimed():
@@ -293,16 +313,17 @@ class Pipeline:
                 target_model = current
             else:
                 return None
-        result = self._llm_call(task_type, prompt, max_tokens, temperature)
+        result = self._llm_call(task_type, prompt, max_tokens, temperature, context=context)
         if result is not None:
             self._state.record_task(target_model)
         return result
 
-    def execute_current(self, task_type, prompt, *, max_tokens=1200, temperature=0):
+    def execute_current(self, task_type, prompt, *, max_tokens=1200, temperature=0, context=None):
+        """[1122] Added context= parameter for DSPy module passthrough."""
         if self._is_claimed():
             LOGGER.warning("[1054] LLM claimed by external process — cannot execute_current task=%s", task_type)
             return None
-        result = self._llm_call(task_type, prompt, max_tokens, temperature)
+        result = self._llm_call(task_type, prompt, max_tokens, temperature, context=context)
         if result is not None:
             self._state.record_task(self._state.current_model or "unknown")
         return result
@@ -332,7 +353,92 @@ class Pipeline:
     def get_stats(self):
         return self._state.to_dict()
 
-    def _llm_call(self, task_type, prompt, max_tokens, temperature):
+    def _dspy_call(self, task_type, prompt, module_path, context=None):
+        """[1122] Execute task via DSPy optimized module instead of raw LLM.
+
+        Loads the DSPy module (cached), configures the LM backend to point
+        at the local llama.cpp server, and calls module.forward().
+        Returns parsed dict or None on failure.
+        """
+        if not _check_dspy_available():
+            return None
+
+        try:
+            import dspy
+
+            # Configure DSPy LM to use local llama.cpp OpenAI-compatible endpoint
+            lm = dspy.LM(
+                model="openai/local",
+                api_base="http://192.168.2.32:8000/v1",
+                api_key="token-abc123",
+                temperature=0,
+                max_tokens=1200,
+            )
+            dspy.configure(lm=lm)
+
+            # Load module (cached)
+            if module_path not in _dspy_modules_cache:
+                LOGGER.info("[1122] Loading DSPy module from %s", module_path)
+                module = dspy.Module.load(module_path)
+                _dspy_modules_cache[module_path] = module
+                LOGGER.info("[1122] DSPy module loaded and cached: %s", module_path)
+            else:
+                module = _dspy_modules_cache[module_path]
+
+            # Call the module with prompt and optional context
+            start = time.time()
+            kwargs = {"input_text": prompt}
+            if context:
+                kwargs["context"] = context
+            LOGGER.info("[1122] DSPy call: task=%s module=%s", task_type, os.path.basename(module_path))
+
+            prediction = module(**kwargs)
+            elapsed = round(time.time() - start, 2)
+
+            # Extract output — DSPy Prediction has named fields
+            # Try common output field names
+            raw_output = None
+            for field in ("output", "response", "answer", "result", "verdict"):
+                if hasattr(prediction, field):
+                    raw_output = getattr(prediction, field)
+                    break
+
+            if raw_output is None:
+                # Fallback: get first non-input field
+                for key in prediction.keys():
+                    if key not in ("input_text", "context"):
+                        raw_output = prediction[key]
+                        break
+
+            if raw_output is None:
+                LOGGER.error("[1122] DSPy module returned no output fields. Keys: %s", list(prediction.keys()))
+                return None
+
+            LOGGER.info("[1122] DSPy success: task=%s elapsed=%.1fs output_len=%d",
+                        task_type, elapsed, len(str(raw_output)))
+
+            # Parse as JSON (same as raw LLM path)
+            return self._parse_json(str(raw_output))
+
+        except Exception as exc:
+            LOGGER.error("[1122] DSPy call failed: %s", exc)
+            return None
+
+    def _llm_call(self, task_type, prompt, max_tokens, temperature, context=None):
+        """[1122] Try DSPy optimized module first, fallback to raw LLM."""
+        current_model = self._state.current_model or "alpha"
+        profile = self._router.get_model_profile(current_model)
+        dspy_module_path = profile.get("dspy_module") if profile else None
+
+        # [1122] DSPy path: use optimized module if available
+        if dspy_module_path and os.path.isfile(dspy_module_path):
+            LOGGER.info("[1122] DSPy module available for model=%s: %s", current_model, dspy_module_path)
+            result = self._dspy_call(task_type, prompt, dspy_module_path, context=context)
+            if result is not None:
+                return result
+            LOGGER.warning("[1122] DSPy call failed for model=%s, falling back to raw LLM", current_model)
+
+        # Raw LLM call (original path / fallback)
         payload = {
             "model": self._state.current_model or "alpha",
             "messages": [{"role": "user", "content": prompt}],

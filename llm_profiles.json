@@ -32,7 +32,7 @@
       ],
       "layer": 1,
       "docker_extra_args": "--reasoning off",
-      "dspy_module": "/home/furycom/dspy_results_35b_moe_labeled/module_bfsrs.json",
+      "dspy_module": "/workspace/dspy-results/moe35b_triage_lfs_k8.json",
       "dspy_score": 1.0,
       "enabled": true
     },
@@ -67,7 +67,8 @@
       "docker_extra_args": "--reasoning off",
       "dspy_module": "/home/furycom/dspy_results_14b_bootstrap/best_module_labeled.json",
       "dspy_score": 0.9875,
-      "enabled": true
+      "enabled": false,
+      "note": "50% sur review - insuffisant, reassigne au 32B session 1242"
     },
     "fast_9b": {
       "name": "Qwen3.5-9B Q4_K_M",
@@ -125,7 +126,6 @@
     "lesson_review": {
       "pipeline": [
         "moe35b_triage",
-        "mid_14b",
         "alpha"
       ],
       "confidence_threshold": 0.9,
@@ -133,7 +133,6 @@
     },
     "kb_audit": {
       "pipeline": [
-        "mid_14b",
         "alpha"
       ],
       "confidence_threshold": 0.9,
@@ -161,7 +160,7 @@
     },
     "session_summary": {
       "pipeline": [
-        "mid_14b"
+        "alpha"
       ],
       "confidence_threshold": 0.9,
       "fallback": "alpha"
