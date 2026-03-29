@@ -924,7 +924,7 @@ def job_lesson_review() -> str:
             "select": "id,lesson_type,lesson_text,importance,created_at,canonical_lock",
             "archived": "eq.false",
             "lesson_type": "neq.rule_canon",
-            "author_system": f"neq.{CONFIG['author_system']}",
+            "screensaver_reviewed_at": "is.null",
             "order": "created_at.asc",
             "limit": CONFIG["batch_sizes"]["lesson_review"],
         }
@@ -988,7 +988,7 @@ def job_lesson_review() -> str:
             batch_kept += 1
             continue
 
-        patch: Dict[str, Any] = {"author_system": CONFIG["author_system"]}
+        patch: Dict[str, Any] = {"author_system": CONFIG["author_system"], "screensaver_reviewed_at": "now()"}
 
         if verdict == "archive":
             patch["archived"] = True
@@ -1037,7 +1037,7 @@ def job_kb_audit() -> str:
         {
             "select": "id,question,answer,category,subcategory,tags,created_at",
             "archived": "eq.false",
-            "author_system": f"neq.{CONFIG['author_system']}",
+            "screensaver_reviewed_at": "is.null",
             "order": "created_at.asc",
             "limit": CONFIG["batch_sizes"]["kb_audit"],
         },
@@ -1101,7 +1101,7 @@ def job_kb_audit() -> str:
             batch_kept += 1
             continue
 
-        patch: Dict[str, Any] = {"author_system": CONFIG["author_system"]}
+        patch: Dict[str, Any] = {"author_system": CONFIG["author_system"], "screensaver_reviewed_at": "now()"}
 
         if verdict == "archive":
             patch["archived"] = True

@@ -45,6 +45,7 @@ const toolsUnlockRoutes = require('./routes/tools-unlock');
 const fileRoutes = require('./routes/file');
 const screensaverRoutes = require('./routes/screensaver');
 const llmRoutes = require('./routes/llm');
+const canonRoutes = require('./routes/canon');
 
 // ========== SHARED MODULES (C7 refonte) ==========
 const { fetchWithTimeout } = require('./shared/fetch-utils');
@@ -142,6 +143,7 @@ app.use(roadmapRoutes);
 app.use(toolsUnlockRoutes);
 app.use(fileRoutes);
 app.use(screensaverRoutes);
+app.use(canonRoutes);
 app.use('/bruce/llm', llmRoutes);
 sessionRoutes.setSafePythonSpawn(safePythonSpawn);
 

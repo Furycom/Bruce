@@ -41,11 +41,14 @@ const DEFAULT_BRUCE_SSH_HOSTS = {
   '192.168.2.146': { user: 'furycom', label: 'furysupa' },
   '192.168.2.154': { user: 'yann', label: 'box2-observability' },
   '192.168.2.173': { user: 'yann', label: 'box2-tube' },
-  '192.168.2.174': { user: 'yann', label: 'box2-n8n' },
+  '192.168.2.174': { user: 'furycom', label: 'box2-n8n' },
   '192.168.2.85': { user: 'furycom', label: 'embedder' },
   '192.168.2.231': { user: 'furycom', label: 'furycom-231' },
   '192.168.2.230': { user: 'furycom', label: 'gateway-host' },
   '192.168.2.249': { user: 'yann', label: 'box2-secrets' },
+  '192.168.2.58': { user: 'root', label: 'proxmox-box1' },
+  '192.168.2.183': { user: 'root', label: 'truenas' },
+  '192.168.2.248': { user: 'root', label: 'homeassistant' },
 };
 
 let BRUCE_SSH_HOSTS = DEFAULT_BRUCE_SSH_HOSTS;

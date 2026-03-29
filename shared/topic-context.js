@@ -95,6 +95,28 @@ async function loadTopicContext(topic, supabaseUrl, supabaseKey) {
   if (!base || !key) return result;
 
   try {
+    // ── 0. Always load bootstrap_critical KB (guaranteed context, bypass RAG score) ──
+    // [1201] Ces KB sont toujours incluses dans le bootstrap, indépendamment du topic
+    const bcResp = await fetchWithTimeout(
+      `${base}/knowledge_base?bootstrap_critical=eq.true&archived=eq.false&select=id,question,answer,category,subcategory&order=id.asc`,
+      { headers },
+      5000,
+    );
+    if (bcResp.ok) {
+      const bcEntries = await bcResp.json();
+      for (const e of bcEntries) {
+        const isRule = e.subcategory === 'anti-patterns' || e.category === 'governance';
+        const target = isRule ? result.rules : result.runbooks;
+        target.push({
+          source: `KB#${e.id}`,
+          category: e.category,
+          subcategory: e.subcategory,
+          text: (e.answer || '').substring(0, 500),
+          bootstrap_critical: true,
+        });
+      }
+    }
+
     // ── 1. Load bruce_tools by category ──
     if (mapping) {
       const catFilter = mapping.tool_cats.map((c) => `category.eq.${encodeURIComponent(c)}`).join(',');

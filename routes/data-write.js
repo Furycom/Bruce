@@ -28,8 +28,17 @@ router.post('/bruce/write', async (req, res) => {
   if (!table_cible || !ALLOWED_TABLES.includes(table_cible)) {
     return res.status(400).json({ ok: false, error: 'table_cible invalide ou manquante. Tables autorisées: ' + ALLOWED_TABLES.join(', ') });
   }
-  if (!contenu_json || typeof contenu_json !== 'object') {
-    return res.status(400).json({ ok: false, error: 'contenu_json manquant ou invalide' });
+  // [1184] Fix: MCP bridge serialise contenu_json en string — parse fallback
+  let parsedContenu = contenu_json;
+  if (typeof contenu_json === 'string') {
+    try {
+      parsedContenu = JSON.parse(contenu_json);
+    } catch (e) {
+      return res.status(400).json({ ok: false, error: 'contenu_json est une string non-JSON: ' + e.message });
+    }
+  }
+  if (!parsedContenu || typeof parsedContenu !== 'object') {
+    return res.status(400).json({ ok: false, error: 'contenu_json manquant ou invalide (type=' + typeof contenu_json + ')' });
   }
 
   const base = String(SUPABASE_URL || '').replace(/\/+$/, '');
@@ -38,15 +47,15 @@ router.post('/bruce/write', async (req, res) => {
 
   try {
     // [779] Fallback lesson_type pour lessons_learned: evite rejet Gate-1
-    if (table_cible === 'lessons_learned' && contenu_json && !contenu_json.lesson_type) {
-      contenu_json.lesson_type = 'solution';
+    if (table_cible === 'lessons_learned' && parsedContenu && !parsedContenu.lesson_type) {
+      parsedContenu.lesson_type = 'solution';
       console.log('[779] lesson_type absent -> fallback solution injecte');
     }
 
     // 1. Push vers staging_queue
     const stagingPayload = {
       table_cible,
-      contenu_json,
+      contenu_json: parsedContenu,
       author_system: author_system || 'mcp-gateway',
       content_hash: content_hash || null
     };

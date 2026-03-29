@@ -862,9 +862,10 @@ router.post('/bruce/session/close', async (req, res) => {
     const infraChanges = Array.isArray(body.infrastructure_changes) ? body.infrastructure_changes.filter(i => i && i.trim()) : [];
     for (const infra of infraChanges) {
       const r = await pushToStaging('knowledge_base', {
-        title: 'Infra change session ' + sessionId,
-        content: infra,
+        question: 'Infra change session ' + sessionId,
+        answer: infra,
         category: 'infrastructure',
+        subcategory: 'infrastructure-change',
         importance: 'high',
         validated: false,
         session_id: sessionId,

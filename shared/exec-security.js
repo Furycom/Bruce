@@ -54,6 +54,25 @@ const WHITELIST = [
   /^\/home\/furycom\/venv-ingestion\/bin\/(python3|pip)\s/,
   // [1115] sudo apt install (package management)
   /^sudo\s+apt\s+(install|update|list)\b/,
+  // [1185] S1297: Proxmox admin commands
+  /^pvesm\s/,
+  /^vzdump\s/,
+  /^qm\s+(snapshot|rollback|delsnapshot)\b/,
+  // [1185] S1297: Storage and disk inspection
+  /^lsblk\b/,
+  /^mount\s+-t\s+(nfs|cifs|ext4|xfs)\b/,
+  /^umount\s/,
+  // [1185] S1297: Screen session management
+  /^screen\s/,
+  // [1185] S1297: crontab inspection
+  /^crontab\s+-l\b/,
+  // [1185] S1297: mv for file management
+  /^mv\s/,
+  // [1185] S1297: chmod (restricted, no 777)
+  /^chmod\s+[0-7]{3}\b/,
+  // [1185] S1297: docker cp and exec
+  /^docker\s+cp\s/,
+  /^docker\s+exec\s/,
 ];
 
 // ── Blacklist: patterns interdits (regex) ──
