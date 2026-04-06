@@ -8,31 +8,31 @@ const https = require('https');
 const insecureAgent = new https.Agent({ rejectUnauthorized: false });
 const router = Router();
 
-// [S1444] Set TLS globally ONCE — fixes Portainer/Cloudflare race condition
+// [S1444] Set TLS globally ONCE
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const DESC = {
-  'furycom (.230)': 'Serveur principal qui orchestre tout BRUCE — gateway, screensaver, LightRAG',
+  'Proxmox Box 1 (.58)': 'Hyperviseur principal — héberge MCP Gateway, Home Assistant, RotKey',
+  'Proxmox Box 2 (.103)': 'Hyperviseur secondaire — héberge 8 VMs de services (automation, media, etc.)',
   'Dell 7910 (.32)': 'Machine avec GPU pour les modèles d\'intelligence artificielle locale',
-  'Proxmox Box1 (.58)': 'Hyperviseur qui héberge les VMs Supabase, Embedder et Rotki',
-  'Proxmox Box2 (.103)': 'Hyperviseur qui héberge 8 VMs de services (automation, media, etc.)',
   'TrueNAS (.60)': 'Serveur de stockage — 22TB RAIDZ2, backups, médias',
-  'Home Assistant (.248)': 'Domotique — contrôle les appareils connectés, sonnettes, caméras',
+  'Supabase (.146)': 'Machine physique dédiée — base de données PostgreSQL, mémoire permanente de BRUCE',
+  'Embedder (.85)': 'Machine physique — transforme le texte en vecteurs pour la recherche sémantique',
   'Furycom PC (.190)': 'Ordinateur personnel de Yann',
-  'Embedder (.85)': 'Transforme le texte en vecteurs pour la recherche sémantique',
-  'Supabase (.146)': 'Base de données PostgreSQL — la mémoire permanente de BRUCE',
-  'box2-daily (.12)': 'VM qui héberge le dashboard BRUCE + services quotidiens',
-  'box2-automation (.174)': 'VM n8n — automatisation des workflows et tâches planifiées',
-  'box2-observability (.154)': 'VM surveillance — Pulse, Langfuse, métriques',
-  'box2-media (.123)': 'VM médias — qBittorrent, téléchargements, catégories',
-  'box2-edge (.87)': 'VM services edge',
-  'box2-docs (.113)': 'VM documentation',
-  'box2-tube (.173)': 'VM médias vidéo',
-  'box2-secrets (.249)': 'VM Vaultwarden — gestionnaire de mots de passe',
-  'Rotki (.231)': 'VM suivi finances et crypto',
-  'MCP Gateway': 'Point d\'entrée unique de BRUCE — route toutes les requêtes',
+  'MCP Gateway (.230)': 'VM Box 1 — serveur principal, gateway, screensaver, LightRAG',
+  'Home Assistant (.248)': 'VM Box 1 — domotique, contrôle appareils connectés',
+  'RotKey (.111)': 'VM Box 1 — suivi finances et crypto (Rotki)',
+  'box2-daily (.12)': 'VM Box 2 — dashboard BRUCE + services quotidiens',
+  'box2-automation (.174)': 'VM Box 2 — n8n, automatisation workflows',
+  'box2-observability (.154)': 'VM Box 2 — Pulse, Langfuse, métriques',
+  'box2-media (.123)': 'VM Box 2 — qBittorrent, téléchargements',
+  'box2-edge (.87)': 'VM Box 2 — services edge',
+  'box2-docs (.113)': 'VM Box 2 — documentation',
+  'box2-tube (.173)': 'VM Box 2 — médias vidéo',
+  'box2-secrets (.249)': 'VM Box 2 — Vaultwarden, mots de passe',
+  'Service MCP Gateway': 'Point d\'entrée unique de BRUCE — route toutes les requêtes',
   'Supabase API': 'API REST pour lire/écrire dans la base de données',
-  'LLM Router': 'Routeur de modèles IA — charge/décharge automatiquement selon la demande',
+  'LLM Router': 'Routeur de modèles IA — charge/décharge selon la demande',
   'LiteLLM': 'Proxy LLM utilisé par LightRAG comme backend',
   'Embedder API': 'API d\'embeddings BGE-m3 pour la recherche sémantique',
   'n8n': 'Moteur d\'automatisation — backup quotidien, watchdog screensaver',
@@ -45,10 +45,10 @@ const DESC = {
   'Portainer': 'Gestion visuelle des containers Docker',
   'Uptime Kuma': 'Surveillance uptime de tous les services',
   'TrueNAS WebUI': 'Interface web du NAS — pools, disques, partages',
-  'Home Assistant': 'Interface domotique — scènes, automatisations maison',
+  'Home Assistant UI': 'Interface domotique — scènes, automatisations maison',
   'Termix': 'Terminal web distant',
   'qBittorrent': 'Client torrent avec catégories automatiques',
-  'Rotki': 'Suivi de portefeuille crypto et finances',
+  'Rotki UI': 'Suivi de portefeuille crypto et finances',
   'Dashboard BRUCE': 'Ce dashboard — vue d\'ensemble du homelab',
   'Cloudflare AI': 'Accès public à OpenWebUI via tunnel Cloudflare',
   'Koffan': 'Site web Koffan',
@@ -61,21 +61,21 @@ const DESC = {
   'Tracktor': 'Suivi de séries TV et films',
 };
 
-// [1451] Fix: Embedder .85 is PHYSICAL (bare metal), not a VM
+// [S1448] TOPOLOGIE CANONIQUE
 const PHYSICAL = [
-  { name: 'furycom (.230)', ip: '192.168.2.230', role: 'MCP Gateway + Screensaver', check: 'ping' },
+  { name: 'Proxmox Box 1 (.58)', ip: '192.168.2.58', role: 'Hyperviseur Proxmox', check: 'ping' },
+  { name: 'Proxmox Box 2 (.103)', ip: '192.168.2.103', role: 'Hyperviseur Proxmox', check: 'ping' },
   { name: 'Dell 7910 (.32)', ip: '192.168.2.32', role: 'LLM Inference GPU', check: 'ping' },
-  { name: 'Proxmox Box1 (.58)', ip: '192.168.2.58', role: 'Hyperviseur Proxmox', check: 'ping' },
-  { name: 'Proxmox Box2 (.103)', ip: '192.168.2.103', role: 'Hyperviseur Proxmox', check: 'ping' },
   { name: 'TrueNAS (.60)', ip: '192.168.2.60', role: 'NAS RAIDZ2', check: 'ping' },
-  { name: 'Home Assistant (.248)', ip: '192.168.2.248', role: 'Domotique', check: 'http', url: 'http://192.168.2.248:8123/' },
-  { name: 'Furycom PC (.190)', ip: '192.168.2.190', role: 'PC Yann', check: 'ping' },
+  { name: 'Supabase (.146)', ip: '192.168.2.146', role: 'PostgreSQL dédié', check: 'ping' },
   { name: 'Embedder (.85)', ip: '192.168.2.85', role: 'BGE-m3 Embeddings', check: 'ping' },
+  { name: 'Furycom PC (.190)', ip: '192.168.2.190', role: 'PC Yann', check: 'ping' },
 ];
 
-// [1448] host = which physical machine hosts this VM
 const VMS = [
-  { name: 'Supabase (.146)', ip: '192.168.2.146', role: 'PostgreSQL/REST', check: 'ping', host: '192.168.2.58', vmid: '101' },
+  { name: 'MCP Gateway (.230)', ip: '192.168.2.230', role: 'Gateway + Screensaver', check: 'ping', host: '192.168.2.58', vmid: '103' },
+  { name: 'Home Assistant (.248)', ip: '192.168.2.248', role: 'Domotique', check: 'http', url: 'http://192.168.2.248:8123/', host: '192.168.2.58' },
+  { name: 'RotKey (.111)', ip: '192.168.2.111', role: 'Finance Rotki', check: 'ping', host: '192.168.2.58', vmid: '111' },
   { name: 'box2-daily (.12)', ip: '192.168.2.12', role: 'Dashboard BRUCE', check: 'ping', host: '192.168.2.103', vmid: '208' },
   { name: 'box2-automation (.174)', ip: '192.168.2.174', role: 'n8n Workflows', check: 'ping', host: '192.168.2.103', vmid: '203' },
   { name: 'box2-observability (.154)', ip: '192.168.2.154', role: 'Pulse + Langfuse', check: 'ping', host: '192.168.2.103', vmid: '204' },
@@ -84,12 +84,10 @@ const VMS = [
   { name: 'box2-docs (.113)', ip: '192.168.2.113', role: 'Documentation', check: 'ping', host: '192.168.2.103', vmid: '205' },
   { name: 'box2-tube (.173)', ip: '192.168.2.173', role: 'Media Tube', check: 'ping', host: '192.168.2.103', vmid: '207' },
   { name: 'box2-secrets (.249)', ip: '192.168.2.249', role: 'Vaultwarden', check: 'ping', host: '192.168.2.103', vmid: '202' },
-  { name: 'Rotki (.231)', ip: '192.168.2.231', role: 'Finance Rotki', check: 'ping', host: '192.168.2.58', vmid: '111' },
 ];
 
-// [1448] host = IP of the machine running this service
 const SERVICES = [
-  { name: 'MCP Gateway', url: 'http://127.0.0.1:4000/health', host: '192.168.2.230' },
+  { name: 'Service MCP Gateway', url: 'http://127.0.0.1:4000/health', host: '192.168.2.230' },
   { name: 'Supabase API', url: 'http://192.168.2.146:8000/rest/v1/?limit=0', host: '192.168.2.146' },
   { name: 'LLM Router', url: 'http://192.168.2.32:8000/health', host: '192.168.2.32' },
   { name: 'LiteLLM', url: 'http://192.168.2.230:4100/health', host: '192.168.2.230' },
@@ -101,15 +99,15 @@ const SERVICES = [
   { name: 'Forgejo', url: 'http://192.168.2.230:3300/', host: '192.168.2.230' },
   { name: 'Pulse', url: 'http://192.168.2.154:7655/api/health', host: '192.168.2.154' },
   { name: 'Langfuse', url: 'http://192.168.2.154:3200/api/public/health', host: '192.168.2.154' },
-  { name: 'Portainer', url: 'https://192.168.2.230:9443/', host: '192.168.2.230', timeout: 8000 },
+  { name: 'Portainer', url: 'https://192.168.2.230:9443/', host: '192.168.2.230', retry: 3 },
   { name: 'Uptime Kuma', url: 'http://192.168.2.230:3001/', host: '192.168.2.230' },
   { name: 'TrueNAS WebUI', url: 'http://192.168.2.60/', host: '192.168.2.60' },
-  { name: 'Home Assistant', url: 'http://192.168.2.248:8123/', host: '192.168.2.248' },
+  { name: 'Home Assistant UI', url: 'http://192.168.2.248:8123/', host: '192.168.2.248' },
   { name: 'Termix', url: 'http://192.168.2.230:18080/', host: '192.168.2.230' },
   { name: 'qBittorrent', url: 'http://192.168.2.123:30024/', host: '192.168.2.123' },
-  { name: 'Rotki', url: 'http://192.168.2.231:8085/', host: '192.168.2.231' },
+  { name: 'Rotki UI', url: 'http://192.168.2.231:8085/', host: '192.168.2.231' },
   { name: 'Dashboard BRUCE', url: 'http://192.168.2.12:8029/', host: '192.168.2.12' },
-  { name: 'Cloudflare AI', url: 'https://ai.furycom.com/', host: '192.168.2.32', timeout: 10000 },
+  { name: 'Cloudflare AI', url: 'https://ai.furycom.com/', host: '192.168.2.32', retry: 3 },
   { name: 'Koffan', url: 'http://192.168.2.12:8028/', host: '192.168.2.12' },
   { name: 'FreshRSS', url: 'http://192.168.2.12:8021/', host: '192.168.2.12' },
   { name: 'Readeck', url: 'http://192.168.2.12:8022/', host: '192.168.2.12' },
@@ -120,9 +118,14 @@ const SERVICES = [
   { name: 'Tracktor', url: 'http://192.168.2.12:8027/', host: '192.168.2.12' },
 ];
 
-// [1449] Proxmox Box2 API
 const PVE_BOX2 = {
   url: 'https://192.168.2.103:8006',
+  token: 'PVEAPIToken=root@pam!claude-mcp=b3b90a84-9e6e-43f4-a4d8-02ba8dfae657',
+};
+
+// [S1448] Proxmox Box1 API
+const PVE_BOX1 = {
+  url: 'https://192.168.2.58:8006',
   token: 'PVEAPIToken=root@pam!claude-mcp=b3b90a84-9e6e-43f4-a4d8-02ba8dfae657',
 };
 
@@ -141,7 +144,7 @@ async function httpCheck(url, timeout = 4000) {
   const t = setTimeout(() => ctrl.abort(), timeout);
   try {
     const opts = { signal: ctrl.signal, headers: { 'User-Agent': 'bruce-health' } };
-    if (url.startsWith('https')) opts.dispatcher = undefined;  // node fetch handles agent differently
+    if (url.startsWith('https')) opts.dispatcher = undefined;
     const r = await fetch(url, opts);
     clearTimeout(t);
     return { ok: r.status < 500, status: r.status };
@@ -151,19 +154,24 @@ async function httpCheck(url, timeout = 4000) {
   }
 }
 
-// [S1444] Fetch REAL memory via SSH free -m on whitelisted VMs
+// [S1448] Retry-based HTTP check for flaky services (Portainer, Cloudflare AI)
+async function httpCheckWithRetry(url, retries = 3, timeout = 5000) {
+  for (let i = 0; i < retries; i++) {
+    const result = await httpCheck(url, timeout);
+    if (result.ok) return result;
+    if (i < retries - 1) await new Promise(r => setTimeout(r, 1000));
+  }
+  return await httpCheck(url, timeout);
+}
+
 async function fetchRealMemorySSH(ip, timeout = 4000) {
   const hostConf = BRUCE_SSH_HOSTS[ip];
   if (!hostConf) return null;
   return new Promise(resolve => {
     const t = setTimeout(() => resolve(null), timeout);
     const args = [
-      '-i', BRUCE_SSH_KEY_PATH,
-      '-o', 'BatchMode=yes',
-      '-o', 'StrictHostKeyChecking=no',
-      '-o', 'ConnectTimeout=3',
-      `${hostConf.user}@${ip}`,
-      'free -m'
+      '-i', BRUCE_SSH_KEY_PATH, '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=3',
+      `${hostConf.user}@${ip}`, 'free -m'
     ];
     execFile('ssh', args, { timeout }, (err, stdout) => {
       clearTimeout(t);
@@ -186,7 +194,6 @@ async function fetchRealMemorySSH(ip, timeout = 4000) {
   });
 }
 
-// [S1444] Fetch real memory for all VMs in parallel
 async function fetchAllRealMemory(vmList) {
   const results = {};
   await Promise.all(vmList.map(async vm => {
@@ -196,21 +203,19 @@ async function fetchAllRealMemory(vmList) {
   return results;
 }
 
-// [1449] Fetch Proxmox Box2 VM resources via API
-async function fetchProxmoxBox2() {
+// [S1448] Generic Proxmox API fetch — works for both Box1 and Box2
+async function fetchProxmoxStats(pveConfig, nodeName) {
   try {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 5000);
-    const hdrs = { Authorization: PVE_BOX2.token };
+    const hdrs = { Authorization: pveConfig.token };
     const [nodeResp, vmResp] = await Promise.all([
-      fetch(`${PVE_BOX2.url}/api2/json/nodes/pve/status`, { headers: hdrs, signal: ctrl.signal }),
-      fetch(`${PVE_BOX2.url}/api2/json/nodes/pve/qemu`, { headers: hdrs, signal: ctrl.signal }),
+      fetch(`${pveConfig.url}/api2/json/nodes/${nodeName}/status`, { headers: hdrs, signal: ctrl.signal }),
+      fetch(`${pveConfig.url}/api2/json/nodes/${nodeName}/qemu`, { headers: hdrs, signal: ctrl.signal }),
     ]);
     const nodeData = nodeResp.ok ? (await nodeResp.json()).data : null;
     const vmList = vmResp.ok ? (await vmResp.json()).data : [];
     clearTimeout(t);
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '1';
 
     const node = nodeData ? {
       cpu_pct: Math.round((nodeData.cpu || 0) * 100),
@@ -233,13 +238,11 @@ async function fetchProxmoxBox2() {
     }
     return { node, vms };
   } catch (e) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '1';
     return { node: null, vms: {}, error: e.message };
   }
 }
 
-// [1450] Generate alerts from data
-function generateAlerts(physResults, vmResults, svcResults, pveData, realMemMap) {
+function generateAlerts(physResults, vmResults, svcResults, pveBox1, pveBox2, realMemMap) {
   const alerts = [];
   for (const item of physResults) {
     if (!item.up) alerts.push({ level: 'critical', msg: `${item.name} est hors ligne`, cat: 'machine' });
@@ -250,10 +253,12 @@ function generateAlerts(physResults, vmResults, svcResults, pveData, realMemMap)
   for (const item of svcResults) {
     if (!item.up) alerts.push({ level: 'warning', msg: `${item.name} ne repond pas`, cat: 'service' });
   }
-  if (pveData && pveData.node && pveData.node.mem_pct >= 85) {
-    alerts.push({ level: pveData.node.mem_pct >= 95 ? 'critical' : 'warning', msg: `Proxmox Box2 RAM: ${pveData.node.mem_pct}% (${pveData.node.mem_used_gb}/${pveData.node.mem_total_gb} GB)` });
+  for (const [label, pve] of [['Proxmox Box 1', pveBox1], ['Proxmox Box 2', pveBox2]]) {
+    if (pve && pve.node && pve.node.mem_pct >= 85) {
+      alerts.push({ level: pve.node.mem_pct >= 95 ? 'critical' : 'warning', msg: `${label} RAM: ${pve.node.mem_pct}% (${pve.node.mem_used_gb}/${pve.node.mem_total_gb} GB)` });
+    }
   }
-  // [S1444] Use REAL memory (SSH free) when available, Proxmox API as fallback
+  const pveVms = { ...(pveBox1 ? pveBox1.vms : {}), ...(pveBox2 ? pveBox2.vms : {}) };
   for (const vm of vmResults) {
     const realMem = realMemMap && realMemMap[vm.ip];
     if (realMem) {
@@ -261,7 +266,7 @@ function generateAlerts(physResults, vmResults, svcResults, pveData, realMemMap)
         alerts.push({ level: realMem.used_pct >= 98 ? 'critical' : 'warning', msg: `${vm.name} RAM reelle: ${realMem.used_pct}% (${realMem.available_gb} GB dispo sur ${realMem.total_gb} GB)`, cat: 'VM', source: 'ssh_free' });
       }
     } else {
-      const pveVm = pveData && pveData.vms && pveData.vms[vm.vmid];
+      const pveVm = pveVms[vm.vmid];
       if (pveVm && pveVm.mem_pct >= 90) {
         alerts.push({ level: 'info', msg: `${vm.name} RAM Proxmox: ${pveVm.mem_pct}% (inclut cache Linux, probablement OK)`, cat: 'VM', source: 'proxmox_api' });
       }
@@ -274,7 +279,7 @@ router.get('/bruce/health-all', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(401).json({ ok: false, error: 'Unauthorized' });
 
-  const [physResults, vmResults, svcResults, pveData, realMemMap] = await Promise.all([
+  const [physResults, vmResults, svcResults, pveBox1, pveBox2, realMemMap] = await Promise.all([
     Promise.all(PHYSICAL.map(async m => {
       const up = m.check === 'http' ? (await httpCheck(m.url)).ok : await pingCheck(m.ip);
       return { ...m, up, desc: DESC[m.name] || '' };
@@ -284,29 +289,24 @@ router.get('/bruce/health-all', async (req, res) => {
       return { ...m, up, desc: DESC[m.name] || '' };
     })),
     Promise.all(SERVICES.map(async s => {
-      const r = await httpCheck(s.url, s.timeout || 4000);
+      const r = s.retry ? await httpCheckWithRetry(s.url, s.retry) : await httpCheck(s.url, s.timeout || 4000);
       return { ...s, up: r.ok, status: r.status, error: r.error, desc: DESC[s.name] || '' };
     })),
-    fetchProxmoxBox2(),
+    fetchProxmoxStats(PVE_BOX1, 'pve'),
+    fetchProxmoxStats(PVE_BOX2, 'pve'),
     fetchAllRealMemory(VMS),
   ]);
 
-  // [1449] Enrich VMs with Proxmox resource data + [S1444] real memory
+  const allPveVms = { ...(pveBox1 ? pveBox1.vms : {}), ...(pveBox2 ? pveBox2.vms : {}) };
   for (const vm of vmResults) {
-    if (vm.vmid && pveData && pveData.vms && pveData.vms[vm.vmid]) {
-      vm.resources = pveData.vms[vm.vmid];
-    }
-    if (realMemMap[vm.ip]) {
-      vm.real_mem = realMemMap[vm.ip];
-    }
+    if (vm.vmid && allPveVms[vm.vmid]) vm.resources = allPveVms[vm.vmid];
+    if (realMemMap[vm.ip]) vm.real_mem = realMemMap[vm.ip];
   }
 
-  const alerts = generateAlerts(physResults, vmResults, svcResults, pveData, realMemMap);
-
+  const alerts = generateAlerts(physResults, vmResults, svcResults, pveBox1, pveBox2, realMemMap);
   const all = [...physResults, ...vmResults, ...svcResults];
   const up = all.filter(x => x.up).length;
 
-  // [1448] Build tree: physical -> vms -> services
   const tree = physResults.map(p => {
     const childVms = vmResults.filter(v => v.host === p.ip).map(v => {
       const childSvcs = svcResults.filter(s => s.host === v.ip);
@@ -322,19 +322,15 @@ router.get('/bruce/health-all', async (req, res) => {
     ok: true, up, total: all.length,
     physical: physResults, vms: vmResults, services: svcResults,
     tree, orphan_services: orphanSvcs,
-    pve_box2: pveData ? pveData.node : null,
+    pve_box1: pveBox1 ? pveBox1.node : null,
+    pve_box2: pveBox2 ? pveBox2.node : null,
     alerts,
   });
 });
 
-
 // ============================================================
-// [1456] GET /bruce/context-summary — Ultra-compact context for bootstrap
-// Aggregates: integrity, dashboard, handoff, top tasks, alerts, screensaver, disks
-// Target: ~400-500 tokens instead of ~1100 from full bootstrap
+// [1456] GET /bruce/context-summary
 // ============================================================
-
-// Cache context-summary for 30 seconds
 let _ctxSummaryCache = { data: null, ts: 0 };
 const CTX_SUMMARY_TTL = 30 * 1000;
 
@@ -380,9 +376,6 @@ router.get('/bruce/context-summary', async (req, res) => {
       }
     }
 
-    // [S1447] Disks removed — redundant with dashboard alerts
-
-    // Screensaver status
     let screensaverStatus = 'unknown';
     try {
       screensaverStatus = await _fetchScreensaverSSH(3000);
@@ -414,8 +407,6 @@ router.get('/bruce/context-summary', async (req, res) => {
   }
 });
 
-
-// [1456] Helper: check screensaver process
 async function _fetchScreensaverSSH(timeout) {
   const hostConf = BRUCE_SSH_HOSTS['192.168.2.230'];
   if (!hostConf) return 'unknown';
