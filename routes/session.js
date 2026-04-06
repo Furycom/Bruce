@@ -13,6 +13,7 @@ const {
   VALIDATE_SERVICE_URL,
 } = require('../shared/config');
 const { fetchWithTimeout } = require('../shared/fetch-utils');
+const { autoClassifyScope } = require('../shared/scope-classifier');
 const { bruceRagContext } = require('./rag');
 const { detectLLMIdentity, loadLLMProfile, buildContextForProfile } = require('../shared/llm-profiles');
 const { buildContextForClaude } = require('../shared/context-engine');
@@ -771,6 +772,14 @@ router.post('/bruce/session/close', async (req, res) => {
    * @returns {any} Helper return value used by route handlers.
    */
   async function pushToStaging(tableCible, contenuJson, intent) {
+    // [1226] Auto-classify project_scope before staging push
+    try {
+      const scopeResult = autoClassifyScope(tableCible, contenuJson);
+      if (scopeResult.applied) {
+        contenuJson.project_scope = scopeResult.classified;
+        console.log('[1226] session_close auto-classified:', scopeResult.original, '->', scopeResult.classified, '(' + intent + ')');
+      }
+    } catch (e) { console.error('[1226] scope-classifier error (non-blocking):', e.message); }
     const payload = {
       table_cible: tableCible,
       contenu_json: contenuJson,
@@ -985,7 +994,7 @@ router.post('/bruce/session/close', async (req, res) => {
               notes: handoffNext.slice(0, 1000),
               author_system: 'session-close-endpoint-676',
               data_family: 'journal',
-              project_scope: 'homelab'
+              project_scope: 'homelab' // [1226] TODO: auto-classify when session context available
             })
           },
           5000

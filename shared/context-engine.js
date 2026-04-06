@@ -1,21 +1,25 @@
-// shared/context-engine.js — [878] Context Engine v1.1
+// shared/context-engine.js — [878] Context Engine v1.1 + [1192] LightRAG integration
 // Replaces Naive RAG with intelligent, scored context injection for Claude sessions
 // Architecture: 3 layers (Anchor / Session / Reference) with token budgeting
 // Inspired by: LangChain context strategies, Google ADK, ACE, Dash/Agno patterns
 
-const { SUPABASE_URL, SUPABASE_KEY } = require('./config');
+const { SUPABASE_URL, SUPABASE_KEY, LIGHTRAG_URL, LIGHTRAG_USER, LIGHTRAG_PASSWORD } = require('./config');
 const { fetchWithTimeout } = require('./fetch-utils');
 
-// Token budget per layer (approximate, 1 token ≈ 4 chars)
+// Token budget per layer (approximate, 1 token ~ 4 chars)
 const TOKEN_BUDGET = {
   anchor: 900,    // Always injected: exigences, profile, handoff, wishes
   session: 1100,  // Adaptive: RAG, relevant tasks, recent lessons
   total: 2000     // Max for Claude context_prompt
 };
 
-// [CE-0b] Cache user_profile — TTL 5 minutes (mêmes données changent rarement)
+// [CE-0b] Cache user_profile — TTL 5 minutes (memes donnees changent rarement)
 let _userProfileCache = { data: null, ts: 0 };
 const USER_PROFILE_CACHE_TTL = 5 * 60 * 1000;
+
+// [1192] Cache LightRAG JWT token — TTL 23 hours (token expires in 24h)
+let _lightragTokenCache = { token: null, ts: 0 };
+const LIGHTRAG_TOKEN_TTL = 23 * 60 * 60 * 1000;
 
 const CHARS_PER_TOKEN = 4;
 
@@ -27,6 +31,86 @@ function truncateToTokens(text, maxTokens) {
   const maxChars = maxTokens * CHARS_PER_TOKEN;
   if ((text || '').length <= maxChars) return text || '';
   return text.slice(0, maxChars) + '…';
+}
+
+
+// ============================================================
+// [1192] LightRAG helpers — JWT auth + naive query
+// ============================================================
+
+/**
+ * Get a cached LightRAG JWT token, refreshing if expired.
+ * @returns {Promise<string|null>} JWT token or null on failure
+ */
+async function getLightRAGToken() {
+  if (!LIGHTRAG_URL || !LIGHTRAG_USER || !LIGHTRAG_PASSWORD) return null;
+  const now = Date.now();
+  if (_lightragTokenCache.token && (now - _lightragTokenCache.ts) < LIGHTRAG_TOKEN_TTL) {
+    return _lightragTokenCache.token;
+  }
+  try {
+    const res = await fetchWithTimeout(
+      LIGHTRAG_URL + '/login',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'username=' + encodeURIComponent(LIGHTRAG_USER) + '&password=' + encodeURIComponent(LIGHTRAG_PASSWORD)
+      },
+      5000
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.access_token) {
+      _lightragTokenCache = { token: data.access_token, ts: now };
+      return data.access_token;
+    }
+    return null;
+  } catch (e) {
+    console.error('[context-engine][getLightRAGToken] Error:', e.message || e);
+    return null;
+  }
+}
+
+/**
+ * Fetch context from LightRAG using naive mode (vector-only, no LLM call).
+ * Returns raw chunk text suitable for injection into context_prompt.
+ * @param {string} query - Search query (typically the session topic)
+ * @param {number} maxTokens - Maximum tokens for the result (default 250)
+ * @returns {Promise<{text: string, tokens: number}|null>} Context text or null on failure
+ */
+async function fetchLightRAGContext(query, maxTokens) {
+  maxTokens = maxTokens || 250;
+  if (!LIGHTRAG_URL || !query) return null;
+  try {
+    const token = await getLightRAGToken();
+    if (!token) return null;
+    const res = await fetchWithTimeout(
+      LIGHTRAG_URL + '/query',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({
+          query: query,
+          mode: 'naive',
+          only_need_context: true
+        })
+      },
+      8000
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    // only_need_context returns the context as a string (the response field)
+    const contextText = typeof data === 'string' ? data : (data.response || data.data || '');
+    if (!contextText || contextText.length < 20) return null;
+    const truncated = truncateToTokens(contextText, maxTokens);
+    return { text: truncated, tokens: estimateTokens(truncated) };
+  } catch (e) {
+    console.error('[context-engine][fetchLightRAGContext] Error:', e.message || e);
+    return null;
+  }
 }
 
 
@@ -134,10 +218,10 @@ async function buildAnchorLayer(currentState, dashboard) {
 
 // ============================================================
 // LAYER 2: SESSION — Adaptive, scored by relevance to topic
-// Sources: RAG results, relevant tasks, recent critical lessons
+// Sources: RAG results, LightRAG graph context, relevant tasks, recent critical lessons
 // ============================================================
 
-function buildSessionLayer(tasks, lessons, ragResults, topic) {
+function buildSessionLayer(tasks, lessons, ragResults, topic, lightragContext) {
   const parts = [];
   let usedTokens = 0;
   const budget = TOKEN_BUDGET.session;
@@ -155,7 +239,7 @@ function buildSessionLayer(tasks, lessons, ragResults, topic) {
     }
   }
 
-  // 2b. RAG results — already scored by similarity
+  // 2b. RAG results — already scored by similarity (bruce_chunks flat RAG)
   if (Array.isArray(ragResults) && ragResults.length > 0) {
     const ragBudget = Math.min(350, budget - usedTokens);
     if (ragBudget > 50) {
@@ -168,6 +252,16 @@ function buildSessionLayer(tasks, lessons, ragResults, topic) {
         parts.push(truncateToTokens(ragText, ragBudget));
         usedTokens += estimateTokens(ragText);
       }
+    }
+  }
+
+  // [1192] 2b-ii. LightRAG graph context — relational knowledge from knowledge graph
+  if (lightragContext && lightragContext.text) {
+    const lrBudget = Math.min(250, budget - usedTokens);
+    if (lrBudget > 50) {
+      const lrText = '**GRAPH RAG:**\n' + lightragContext.text;
+      parts.push(truncateToTokens(lrText, lrBudget));
+      usedTokens += Math.min(lightragContext.tokens || estimateTokens(lrText), lrBudget);
     }
   }
 
@@ -195,8 +289,12 @@ function buildSessionLayer(tasks, lessons, ragResults, topic) {
 // ============================================================
 
 async function buildContextForClaude({ dashboard, tasks, lessons, ragResults, currentState, topic }) {
-  const anchor = await buildAnchorLayer(currentState, dashboard);
-  const session = buildSessionLayer(tasks, lessons, ragResults, topic);
+  // [1192] Fetch LightRAG context in parallel with anchor layer (non-blocking)
+  const [anchor, lightragCtx] = await Promise.all([
+    buildAnchorLayer(currentState, dashboard),
+    fetchLightRAGContext(topic || 'homelab BRUCE architecture', 250).catch(() => null)
+  ]);
+  const session = buildSessionLayer(tasks, lessons, ragResults, topic, lightragCtx);
 
   const contextParts = [];
   if (anchor.text) contextParts.push(anchor.text);
@@ -211,7 +309,8 @@ async function buildContextForClaude({ dashboard, tasks, lessons, ragResults, cu
       anchor_tokens: anchor.tokens,
       session_tokens: session.tokens,
       total_tokens: totalTokens,
-      budget_used_pct: Math.round((totalTokens / TOKEN_BUDGET.total) * 100)
+      budget_used_pct: Math.round((totalTokens / TOKEN_BUDGET.total) * 100),
+      lightrag_available: !!(lightragCtx && lightragCtx.text)
     }
   };
 }
@@ -220,6 +319,7 @@ module.exports = {
   buildContextForClaude,
   buildAnchorLayer,
   buildSessionLayer,
+  fetchLightRAGContext,
   estimateTokens,
   truncateToTokens,
   TOKEN_BUDGET

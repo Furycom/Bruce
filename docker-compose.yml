@@ -27,7 +27,7 @@ services:
     volumes:
       - /home/furycom/mcp-stack:/workspace
       - /home/furycom/mcp-stack/shared:/app/shared:ro
-      - /home/furycom/mcp-stack/routes:/app/routes:ro
+      - /home/furycom/mcp-stack/routes:/app/routes:rw
       - /home/furycom/manual-docs:/manual-docs:ro
       - /home/furycom/bruce-config:/home/furycom/bruce-config
       - /home/furycom/inbox:/home/furycom/inbox

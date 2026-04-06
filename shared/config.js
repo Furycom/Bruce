@@ -19,6 +19,11 @@ const GATEWAY_PUBLIC_URL = process.env.GATEWAY_PUBLIC_URL || 'http://192.168.2.2
 const SUPABASE_REST_FALLBACK_URL = process.env.SUPABASE_REST_FALLBACK_URL || 'http://192.168.2.146:8000/rest/v1';
 const MANUAL_ROOT = process.env.MANUAL_ROOT || '/manual-docs';
 
+// [1192] LightRAG integration
+const LIGHTRAG_URL = process.env.LIGHTRAG_URL || 'http://192.168.2.230:9621';
+const LIGHTRAG_USER = process.env.LIGHTRAG_USER || 'bruce';
+const LIGHTRAG_PASSWORD = process.env.LIGHTRAG_PASSWORD || '';
+
 const BRUCE_AUTH_TOKEN = process.env.BRUCE_AUTH_TOKEN || '';
 const BRUCE_LLM_API_BASE = process.env.BRUCE_LLM_API_BASE || '';
 const BRUCE_LLM_MODEL = process.env.BRUCE_LLM_MODEL || '';
@@ -47,7 +52,9 @@ const DEFAULT_BRUCE_SSH_HOSTS = {
   '192.168.2.230': { user: 'furycom', label: 'gateway-host' },
   '192.168.2.249': { user: 'yann', label: 'box2-secrets' },
   '192.168.2.58': { user: 'root', label: 'proxmox-box1' },
-  '192.168.2.183': { user: 'root', label: 'truenas' },
+  '192.168.2.183': { user: 'root', label: 'truenas-old-decommissioned' },
+  '192.168.2.60': { user: 'truenas_admin', label: 'truenas-new' },
+  '192.168.2.12': { user: 'yann', label: 'box2-daily' },
   '192.168.2.248': { user: 'root', label: 'homeassistant' },
 };
 
@@ -74,4 +81,5 @@ module.exports = {
   BRUCE_LLM_API_KEY, BRUCE_LITELLM_KEY, BRUCE_MAX_MESSAGE_CHARS,
   BRUCE_LLM_TIMEOUT_MS, BRUCE_MAX_CONCURRENT, BRUCE_FALLBACK_LOG_PATH,
   BRUCE_SOURCE_DEFAULT, BRUCE_SSH_KEY_PATH, BRUCE_SSH_HOSTS, CONNECTORS_PATH,
+  LIGHTRAG_URL, LIGHTRAG_USER, LIGHTRAG_PASSWORD,
 };

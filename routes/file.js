@@ -1,4 +1,4 @@
-// routes/file.js — [917] File transfer endpoint
+// routes/file.js — [917] File transfer endpoint + [B3] bind mount warning
 // POST /bruce/file/write — Write file content directly to .230 filesystem
 const express = require('express');
 const router = express.Router();
@@ -11,10 +11,6 @@ const ALLOWED_BASES = ['/tmp', '/home/furycom'];
 
 /**
  * Handles POST /bruce/file/write.
- * Expected params: request path/query/body fields consumed by this handler.
- * @param {import('express').Request} req - Express request containing endpoint parameters.
- * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
- * @returns {Promise<void>|void} Sends the HTTP JSON response.
  */
 router.post('/bruce/file/write', async (req, res) => {
   const auth = validateBruceAuth(req);
@@ -59,12 +55,19 @@ router.post('/bruce/file/write', async (req, res) => {
     }
 
     const stats = fs.statSync(resolved);
-    return res.json({
+    const response = {
       ok: true,
       filepath: resolved,
       size: stats.size,
       mode: writeMode === 'a' ? 'append' : 'overwrite'
-    });
+    };
+
+    // [B3] Avertissement bind mount /uploads/ — visible UNIQUEMENT depuis host .230
+    if (resolved.startsWith('/home/furycom/uploads/') || resolved === '/home/furycom/uploads') {
+      response._note = 'RAPPEL: /home/furycom/uploads/ est un bind mount visible UNIQUEMENT depuis le host .230. Ce fichier n est PAS accessible depuis .32 (furycomai). Pour copier vers .32: SCP depuis .230 (scp -i ~/.ssh/homelab_key fichier furycomai:/path/).';
+    }
+
+    return res.json(response);
   } catch (e) { console.error(`[file.js] operation failed:`, e.message);
     return res.status(500).json({ ok: false, error: String(e.message || e) });
   }
@@ -73,10 +76,6 @@ router.post('/bruce/file/write', async (req, res) => {
 // GET /bruce/file/read — Read file content from .230 filesystem
 /**
  * Handles GET /bruce/file/read.
- * Expected params: request path/query/body fields consumed by this handler.
- * @param {import('express').Request} req - Express request containing endpoint parameters.
- * @param {import('express').Response} res - Express response returning `{ ok: true, data: ... }` or `{ ok: false, error: 'description' }`.
- * @returns {Promise<void>|void} Sends the HTTP JSON response.
  */
 router.get('/bruce/file/read', async (req, res) => {
   const auth = validateBruceAuth(req);

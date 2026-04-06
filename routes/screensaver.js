@@ -1,11 +1,13 @@
-// routes/screensaver.js — [1036] Dynamic context for screensaver LLM jobs
+// routes/screensaver.js — [1036][1228] Dynamic context for screensaver LLM jobs
+// v2.0 S1337: Enriched with RAG semantic + LightRAG intelligent context
 const express = require('express');
 const router = express.Router();
 const { validateBruceAuth } = require('../shared/auth');
-const { SUPABASE_URL, SUPABASE_KEY } = require('../shared/config');
+const { SUPABASE_URL, SUPABASE_KEY, EMBEDDER_URL } = require('../shared/config');
 const { fetchWithTimeout } = require('../shared/fetch-utils');
+const { fetchLightRAGContext, estimateTokens, truncateToTokens } = require('../shared/context-engine');
 
-const VALID_JOBS = ['lesson_review', 'kb_audit', 'dedup_semantic', 'lightrag_populate', 'session_summary', 'ingestion'];
+const VALID_JOBS = ['lesson_review', 'kb_audit', 'dedup_semantic', 'lightrag_populate', 'session_summary', 'ingestion', 'vrc_pipeline'];
 
 const OBSOLETE_TECH = [
   { name: 'vLLM', replacement: 'llama.cpp server-cuda', detail: 'Toute mention de vllm serve, vLLM API, VLLMExtractor est obsolete' },
@@ -18,51 +20,110 @@ const OBSOLETE_TECH = [
   { name: 'vllm service name', replacement: 'llama-server', detail: 'Renomme' },
 ];
 
+// [1228] Build topic string for RAG queries based on job type and item hint
+function buildSearchTopic(jobType, itemHint) {
+  var topicMap = {
+    lesson_review: 'lesson review qualite BRUCE homelab',
+    kb_audit: 'knowledge base audit coherence infrastructure',
+    dedup_semantic: 'deduplication lessons knowledge base',
+    session_summary: 'session summary extraction taches decisions',
+    ingestion: 'ingestion extraction faits techniques homelab',
+    lightrag_populate: 'LightRAG graph knowledge ingestion',
+    vrc_pipeline: 'knowledge base canon evaluation quality audit architecture VRC pipeline gates',
+  };
+  var base = topicMap[jobType] || 'BRUCE homelab';
+  if (itemHint && typeof itemHint === 'string' && itemHint.length > 10) {
+    // Extract key terms from item hint (first 150 chars, cleaned)
+    var hint = itemHint.substring(0, 150).replace(/[^a-zA-Z0-9\u00C0-\u017F .,-]/g, ' ').trim();
+    return hint + ' ' + base;
+  }
+  return base;
+}
+
+// [1228] Fetch RAG semantic context for the screensaver job
+async function fetchRAGContext(topic, budgetTokens) {
+  try {
+    var embedRes = await fetchWithTimeout(
+      EMBEDDER_URL + '/embed',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputs: topic.substring(0, 256), max_length: 256 }) },
+      6000
+    );
+    var embedData = await embedRes.json();
+    var embedding = Array.isArray(embedData) ? embedData[0] : (embedData && embedData.embeddings && embedData.embeddings[0]);
+    if (!embedding) return null;
+
+    var base = String(SUPABASE_URL || '').replace(/\/+$/, '');
+    var hSupa = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+    var qvec = '[' + embedding.map(function(x) { return Number(x); }).join(',') + ']';
+    var ragRes = await fetchWithTimeout(
+      base + '/rpc/bruce_rag_hybrid_search_text',
+      { method: 'POST', headers: hSupa,
+        body: JSON.stringify({ qtext: topic.substring(0, 200), qvec: qvec, k: 8 }) },
+      8000
+    );
+    var ragData = await ragRes.json();
+    if (!Array.isArray(ragData) || ragData.length === 0) return null;
+
+    var items = ragData.slice(0, 6).map(function(r) {
+      var score = Math.round((r.hybrid_score || r.cos_sim || 0) * 100) / 100;
+      var preview = truncateToTokens((r.preview || '').trim(), 80);
+      return '(' + score + ') ' + preview;
+    });
+    var ragText = 'CONTEXTE RAG SEMANTIQUE:\n' + items.join('\n');
+    return truncateToTokens(ragText, budgetTokens);
+  } catch (err) {
+    console.error('[screensaver-context][1228] RAG error:', err.message);
+    return null;
+  }
+}
+
+// [1228] Fetch bootstrap-critical KB for essential context
+async function fetchBootstrapCriticalKB(budgetTokens) {
+  try {
+    var base = String(SUPABASE_URL || '').replace(/\/+$/, '');
+    var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    var resp = await fetchWithTimeout(
+      base + '/knowledge_base?bootstrap_critical=eq.true&archived=is.false&select=id,question,answer&limit=15',
+      { headers: headers }, 5000
+    );
+    if (!resp.ok) return null;
+    var entries = await resp.json();
+    if (!Array.isArray(entries) || entries.length === 0) return null;
+
+    var lines = entries.map(function(e) {
+      var summary = (e.answer || '').substring(0, 120).replace(/\n/g, ' ');
+      return '- [KB#' + e.id + '] ' + summary;
+    });
+    var text = 'KB BOOTSTRAP-CRITICAL (regles immuables):\n' + lines.join('\n');
+    return truncateToTokens(text, budgetTokens);
+  } catch (err) {
+    console.error('[screensaver-context][1228] Bootstrap KB error:', err.message);
+    return null;
+  }
+}
+
+// Original static infra context (kept as fallback/complement)
 async function buildInfraContext() {
-  var base = SUPABASE_URL.replace(/\/+$/, '');
+  var base = String(SUPABASE_URL || '').replace(/\/+$/, '');
   var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
   var sections = [];
   try {
     var kbResp = await fetchWithTimeout(
-      base + '/knowledge_base?category=eq.infrastructure&archived=is.false&select=id,question,answer&order=id.desc&limit=15',
+      base + '/knowledge_base?category=eq.infrastructure&archived=is.false&select=id,question,answer&order=id.desc&limit=10',
       { headers: headers }, 5000
     );
     if (kbResp.ok) {
       var entries = await kbResp.json();
       var infraLines = [];
       for (var i = 0; i < entries.length; i++) {
-        var summary = (entries[i].answer || '').substring(0, 200).replace(/\n/g, ' ');
+        var summary = (entries[i].answer || '').substring(0, 150).replace(/\n/g, ' ');
         if (summary.length > 20) infraLines.push('- [KB#' + entries[i].id + '] ' + summary);
       }
-      if (infraLines.length > 0) sections.push('INFRASTRUCTURE ACTUELLE (depuis KB):\n' + infraLines.join('\n'));
-    }
-    var govResp = await fetchWithTimeout(
-      base + '/knowledge_base?category=eq.governance&subcategory=eq.anti-patterns&archived=is.false&select=id,answer&order=id.asc&limit=10',
-      { headers: headers }, 5000
-    );
-    if (govResp.ok) {
-      var rules = await govResp.json();
-      var ruleLines = [];
-      for (var j = 0; j < rules.length; j++) {
-        ruleLines.push('- [KB#' + rules[j].id + '] ' + (rules[j].answer || '').substring(0, 150).replace(/\n/g, ' '));
-      }
-      if (ruleLines.length > 0) sections.push('REGLES DE GOUVERNANCE:\n' + ruleLines.join('\n'));
-    }
-    var llmResp = await fetchWithTimeout(
-      base + '/knowledge_base?tags=ov.{llm,qwen,llama}&archived=is.false&select=id,answer&limit=5',
-      { headers: headers }, 5000
-    );
-    if (llmResp.ok) {
-      var llmEntries = await llmResp.json();
-      var llmLines = [];
-      for (var k = 0; k < llmEntries.length; k++) {
-        llmLines.push('- [KB#' + llmEntries[k].id + '] ' + (llmEntries[k].answer || '').substring(0, 200).replace(/\n/g, ' '));
-      }
-      if (llmLines.length > 0) sections.push('MODELES LLM (depuis KB):\n' + llmLines.join('\n'));
+      if (infraLines.length > 0) sections.push('INFRASTRUCTURE ACTUELLE:\n' + infraLines.join('\n'));
     }
   } catch (err) {
-    console.error('[screensaver-context] KB fetch error:', err.message);
-    sections.push('ERREUR: Impossible de charger le contexte KB dynamique.');
+    console.error('[screensaver-context] Infra KB fetch error:', err.message);
   }
   return sections;
 }
@@ -119,38 +180,103 @@ function buildJobRules(jobType) {
   return 'REGLES STRICTES:\n' + result.join('\n');
 }
 
+// [1228] Main endpoint — enriched with RAG semantic + LightRAG context
 router.post('/bruce/screensaver/context', async function(req, res) {
   var auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
 
   var startMs = Date.now();
   var jobType = (req.body || {}).job_type;
+  var itemHint = (req.body || {}).item_hint || '';
   if (!jobType || VALID_JOBS.indexOf(jobType) === -1) {
     return res.status(400).json({ ok: false, error: 'Invalid job_type. Must be one of: ' + VALID_JOBS.join(', ') });
   }
+
   try {
-    var infraSections = await buildInfraContext();
+    // Build search topic from job type + item content
+    var searchTopic = buildSearchTopic(jobType, itemHint);
+
+    // [1228] Fetch all context sources in parallel for speed
+    var results = await Promise.all([
+      fetchRAGContext(searchTopic, 250).catch(function() { return null; }),
+      fetchLightRAGContext(searchTopic, 200).catch(function() { return null; }),
+      fetchBootstrapCriticalKB(200).catch(function() { return null; }),
+      buildInfraContext().catch(function() { return []; }),
+    ]);
+
+    var ragContext = results[0];
+    var lightragContext = results[1];
+    var bootstrapKB = results[2];
+    var infraSections = results[3];
     var obsoleteBlock = buildObsoleteBlock();
     var jobRules = buildJobRules(jobType);
     var now = new Date().toISOString().split('T')[0];
-    var contextBlock = [
-      'CONTEXTE DYNAMIQUE BRUCE (genere ' + now + ')',
-      '',
-      infraSections.join('\n\n'),
-      '',
-      obsoleteBlock,
-      '',
+
+    // Track which sources contributed
+    var sourcesUsed = [];
+
+    var contextParts = [
+      'CONTEXTE DYNAMIQUE BRUCE v2 (genere ' + now + ', job: ' + jobType + ')',
+    ];
+
+    // 1. Bootstrap-critical KB (always first — immutable rules)
+    if (bootstrapKB) {
+      contextParts.push(bootstrapKB);
+      sourcesUsed.push('bootstrap_critical');
+    }
+
+    // 2. RAG semantic (item-specific if item_hint provided)
+    if (ragContext) {
+      contextParts.push(ragContext);
+      sourcesUsed.push('rag_semantic');
+    }
+
+    // 3. LightRAG graph context (relational knowledge)
+    if (lightragContext && lightragContext.text) {
+      var lrText = 'CONTEXTE GRAPHE LIGHTRAG:\n' + truncateToTokens(lightragContext.text, 200);
+      contextParts.push(lrText);
+      sourcesUsed.push('lightrag_graph');
+    }
+
+    // 4. Infrastructure KB (reduced — bootstrap + RAG already cover most)
+    if (infraSections.length > 0) {
+      contextParts.push(infraSections.join('\n'));
+      sourcesUsed.push('infra_kb');
+    }
+
+    // 5. Obsolete tech (always — compact, essential for review/audit)
+    contextParts.push(obsoleteBlock);
+    sourcesUsed.push('obsolete_tech');
+
+    // 6. Architecture summary (compact)
+    contextParts.push(
       'ARCHITECTURE ACTUELLE:',
-      '- Write-path: POST /bruce/write -> staging_queue -> validate.py -> canonical REST. PAS PostgREST direct.',
-      '- Bootstrap: claude.md v7.1 -> Memory MCP -> POST /bruce/bootstrap -> context_prompt + context.',
+      '- Write-path: POST /bruce/write -> staging_queue -> validate.py -> canonical REST.',
       '- SSH: TOUJOURS via alias (furymcp, furycomai, furysupa), JAMAIS IP directe.',
-      '- LLM multi-modele: MoE35B (triage+dedup+lesson_review DSPy 100%), 14B (kb_audit DSPy 97%), 32B Alpha (lesson_review+ingestion+session_summary+kb_audit fallback). 9B review ABANDONNE.',
-      '',
-      jobRules,
-    ].join('\n');
-    res.json({ ok: true, job_type: jobType, context: contextBlock, context_length: contextBlock.length, generated_at: new Date().toISOString(), elapsed_ms: Date.now() - startMs });
+      '- LLM: Qwen3-32B Alpha principal. Screensaver reviewed_at + is_canon + bootstrap_critical.',
+      '- Supabase .146. Gateway .230:4000. LLM .32:8000. Embedder .85:8081. LightRAG .230:9621.'
+    );
+
+    // 7. Job-specific rules (always last — closest to the task)
+    contextParts.push(jobRules);
+    sourcesUsed.push('job_rules');
+
+    var contextBlock = contextParts.join('\n\n');
+    var totalTokens = estimateTokens(contextBlock);
+
+    res.json({
+      ok: true,
+      job_type: jobType,
+      context: contextBlock,
+      context_length: contextBlock.length,
+      context_tokens: totalTokens,
+      sources_used: sourcesUsed,
+      item_hint_used: itemHint.length > 0,
+      generated_at: new Date().toISOString(),
+      elapsed_ms: Date.now() - startMs
+    });
   } catch (err) {
-    console.error('[screensaver-context] Error:', err);
+    console.error('[screensaver-context][1228] Error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });

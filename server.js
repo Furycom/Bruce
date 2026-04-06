@@ -34,6 +34,7 @@ const searchRoutes = require('./routes/search');
 // ========== ROUTE MODULES (C7 refonte) ==========
 const dataReadRoutes = require('./routes/data-read');
 const dataWriteRoutes = require('./routes/data-write');
+const dataPatchRoutes = require('./routes/data-patch');
 const inboxRoutes = require('./routes/inbox');
 const infraRoutes = require('./routes/infra');
 const ragRoutes = require('./routes/rag');
@@ -46,10 +47,16 @@ const fileRoutes = require('./routes/file');
 const screensaverRoutes = require('./routes/screensaver');
 const llmRoutes = require('./routes/llm');
 const canonRoutes = require('./routes/canon');
+const treeRoutes = require('./routes/tree');
+const scopesRoutes = require('./routes/scopes');
+const scriptsRoutes = require('./routes/scripts');
+const conceptsRoutes = require('./routes/concepts');
 
 // ========== SHARED MODULES (C7 refonte) ==========
 const { fetchWithTimeout } = require('./shared/fetch-utils');
 const { bruceRagContext, BRUCE_RAG_METRICS } = require('./routes/rag');
+const healthAllRoutes = require('./routes/health-all');
+const dashboardProjectsRoutes = require('./routes/dashboard-projects');
 const { detectLLMIdentity, loadLLMProfile, buildContextForProfile, bruceClientIp, BRUCE_OPERATING_PRINCIPLES } = require('./shared/llm-profiles');
 
 const app = express();
@@ -130,6 +137,7 @@ app.use('/bruce/search', searchRoutes);
 // Mount C7 route modules
 app.use(dataReadRoutes);
 app.use(dataWriteRoutes);
+app.use(dataPatchRoutes);
 app.use(inboxRoutes);
 app.use(infraRoutes);
 app.use(ragRoutes);
@@ -144,7 +152,13 @@ app.use(toolsUnlockRoutes);
 app.use(fileRoutes);
 app.use(screensaverRoutes);
 app.use(canonRoutes);
+app.use(treeRoutes);
+app.use(scopesRoutes);
+app.use('/bruce/scripts', scriptsRoutes);
 app.use('/bruce/llm', llmRoutes);
+app.use('/bruce/concepts', conceptsRoutes);
+app.use(healthAllRoutes);
+app.use(dashboardProjectsRoutes);
 sessionRoutes.setSafePythonSpawn(safePythonSpawn);
 
 // ========== HEALTH ==========

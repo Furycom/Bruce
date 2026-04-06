@@ -456,7 +456,8 @@ router.post('/bruce/bootstrap', async (req, res) => {
   const includeLessons = req.body && req.body.include_lessons === false ? false : true;
   const includeState = req.body && req.body.include_state === false ? false : true;
   // [CE-5] Compact mode: only context_prompt + essential fields, skip raw data already in context_prompt
-  const compact = req.body && req.body.compact === true;
+  // [S1444] Compact by default — saves ~8000 tokens. Pass compact=false to get full data.
+  const compact = req.body && req.body.compact === false ? false : true;
   const startMs = Date.now();
 
   // [CE-2] Map bootstrap model param to LLM identity for session/init
@@ -512,22 +513,10 @@ router.post('/bruce/bootstrap', async (req, res) => {
       context_prompt: sessionData.context_prompt || null,
       context_meta: sessionData.context_meta || null,
       dashboard: sessionData.dashboard || null,
-      next_tasks: sessionData.next_tasks || [],
-      // [1024] Service registry - all BRUCE services with IP:port:ssh_alias
-      services: [
-        { name: 'gateway', url: 'http://192.168.2.230:4000', ssh: 'furymcp', role: 'MCP Gateway' },
-        { name: 'supabase', url: 'http://192.168.2.146:8000', ssh: 'furysupa', role: 'PostgreSQL/REST' },
-        { name: 'llama-server', url: 'http://192.168.2.32:8000', ssh: 'furycomai', role: 'LLM Qwen3-32B' },
-        { name: 'litellm', url: 'http://192.168.2.230:4100', ssh: 'furymcp', role: 'LLM proxy' },
-        { name: 'n8n', url: 'http://192.168.2.174:5678', ssh: 'box2-automation', role: 'Workflow automation' },
-        { name: 'embedder', url: 'http://192.168.2.85:8081', ssh: null, role: 'BGE-m3 embeddings' },
-        { name: 'validate', url: 'http://192.168.2.230:4001', ssh: 'furymcp', role: 'Quality gates' },
-        { name: 'pulse', url: 'http://192.168.2.154:7655', ssh: 'box2-observability', role: 'Monitoring' },
-        { name: 'langfuse', url: 'http://192.168.2.154:3200', ssh: 'box2-observability', role: 'LLM observability' },
-        { name: 'forgejo', url: 'http://192.168.2.230:3300', ssh: 'furymcp', role: 'Git forge' },
-        { name: 'lightrag', url: 'http://192.168.2.230:9621', ssh: 'furymcp', role: 'Graph RAG' },
-        { name: 'openwebui', url: 'http://192.168.2.32:3000', ssh: 'furycomai', role: 'LLM web UI' },
-      ]
+      // [S1444] Filter tasks to P1-P2 max 20 — saves ~5000 tokens
+      next_tasks: (sessionData.next_tasks || []).filter(t => t.priority <= 2).slice(0, 20),
+      // [S1444] Services registry removed — available in dashboard http://192.168.2.12:8029
+      // Use /bruce/health-all for live service status
     };
 
     // In full mode (compact=false), include raw data fields
@@ -786,10 +775,28 @@ router.get('/bruce/llm/status', async (req, res) => {
       }
     })(),
 
-    // 2. llama-server /slots
+    // 2. llama-server /slots + model name [S1344 fix: router mode needs ?model=<id>]
     (async () => {
       try {
-        const slotResp = await fetchWithTimeout(LOCAL_LLM_URL + '/slots', {
+        // Step 2a: find loaded model via /v1/models
+        let loadedModelId = null;
+        const modelsResp = await fetchWithTimeout(LOCAL_LLM_URL + '/v1/models', {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer token-abc123' }
+        }, 3000);
+        if (modelsResp.ok) {
+          const modelsData = await modelsResp.json();
+          const loaded = (modelsData.data || []).find(m => m.status?.value === 'loaded');
+          if (loaded) {
+            loadedModelId = loaded.id;
+            result.llama_server.model = loaded.id;
+          }
+        }
+        // Step 2b: call /slots with model param (required for router mode)
+        const slotsUrl = loadedModelId
+          ? LOCAL_LLM_URL + '/slots?model=' + encodeURIComponent(loadedModelId)
+          : LOCAL_LLM_URL + '/slots';
+        const slotResp = await fetchWithTimeout(slotsUrl, {
           method: 'GET',
           headers: { 'Authorization': 'Bearer token-abc123' }
         }, 4000);
@@ -807,25 +814,12 @@ router.get('/bruce/llm/status', async (req, res) => {
           }
         }
       } catch (e) {
-        console.error('[infra.js][/bruce/llm/status] slots check failed:', e.message || e);
+        console.error('[infra.js][/bruce/llm/status] slots+model check failed:', e.message || e);
       }
     })(),
 
-    // 3. llama-server /props (model name)
-    (async () => {
-      try {
-        const propsResp = await fetchWithTimeout(LOCAL_LLM_URL + '/props', {
-          method: 'GET',
-          headers: { 'Authorization': 'Bearer token-abc123' }
-        }, 3000);
-        if (propsResp.ok) {
-          const props = await propsResp.json();
-          result.llama_server.model = props.default_generation_settings?.model || null;
-        }
-      } catch (e) {
-        console.error('[infra.js][/bruce/llm/status] props check failed:', e.message || e);
-      }
-    })(),
+    // 3. (merged into step 2 — S1344)
+    (async () => {})(),
 
     // 4. LiteLLM liveliness
     (async () => {
