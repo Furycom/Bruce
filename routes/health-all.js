@@ -285,7 +285,7 @@ router.get('/bruce/health-all', async (req, res) => {
       return { ...m, up, desc: DESC[m.name] || '' };
     })),
     Promise.all(VMS.map(async m => {
-      const up = m.check === 'http' ? (await httpCheck(m.url)).ok : await pingCheck(m.ip);
+      let up = m.check === 'http' ? (await httpCheck(m.url)).ok : await pingCheck(m.ip);
       return { ...m, up, desc: DESC[m.name] || '' };
     })),
     Promise.all(SERVICES.map(async s => {
@@ -297,6 +297,14 @@ router.get('/bruce/health-all', async (req, res) => {
     fetchAllRealMemory(VMS),
   ]);
 
+  // [S1448] Proxmox fallback: if VM failed ping but Proxmox says running, mark as up
+  const pveAllVms = { ...(pveBox1 ? pveBox1.vms : {}), ...(pveBox2 ? pveBox2.vms : {}) };
+  for (const vm of vmResults) {
+    if (!vm.up && vm.vmid && pveAllVms[vm.vmid] && pveAllVms[vm.vmid].status === 'running') {
+      vm.up = true;
+      vm.up_source = 'proxmox_api';
+    }
+  }
   const allPveVms = { ...(pveBox1 ? pveBox1.vms : {}), ...(pveBox2 ? pveBox2.vms : {}) };
   for (const vm of vmResults) {
     if (vm.vmid && allPveVms[vm.vmid]) vm.resources = allPveVms[vm.vmid];
