@@ -57,6 +57,8 @@ const { fetchWithTimeout } = require('./shared/fetch-utils');
 const { bruceRagContext, BRUCE_RAG_METRICS } = require('./routes/rag');
 const healthAllRoutes = require('./routes/health-all');
 const dashboardProjectsRoutes = require('./routes/dashboard-projects');
+const dashboardControlRoutes = require("./routes/dashboard-control");
+const screensaverStatusRoutes = require("./routes/screensaver-status");
 const { detectLLMIdentity, loadLLMProfile, buildContextForProfile, bruceClientIp, BRUCE_OPERATING_PRINCIPLES } = require('./shared/llm-profiles');
 
 const app = express();
@@ -159,6 +161,8 @@ app.use('/bruce/llm', llmRoutes);
 app.use('/bruce/concepts', conceptsRoutes);
 app.use(healthAllRoutes);
 app.use(dashboardProjectsRoutes);
+app.use(dashboardControlRoutes);
+app.use(screensaverStatusRoutes);
 sessionRoutes.setSafePythonSpawn(safePythonSpawn);
 
 // ========== HEALTH ==========

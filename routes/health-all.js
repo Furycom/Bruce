@@ -128,7 +128,7 @@ const PVE_BOX2 = {
 // [S1448] Proxmox Box1 API
 const PVE_BOX1 = {
   url: 'https://192.168.2.58:8006',
-  token: 'PVEAPIToken=root@pam!claude-mcp=b3b90a84-9e6e-43f4-a4d8-02ba8dfae657',
+  token: 'PVEAPIToken=root@pam!claude-mcp=0e2fff82-0561-40ce-860d-2e397d01b46e',
 };
 
 async function pingCheck(ip, timeout = 3000) {
@@ -166,32 +166,61 @@ async function httpCheckWithRetry(url, retries = 3, timeout = 5000) {
   return await httpCheck(url, timeout);
 }
 
-async function fetchRealMemorySSH(ip, timeout = 4000) {
+async function fetchRealMemorySSH(ip, timeout = 5000) {
   const hostConf = BRUCE_SSH_HOSTS[ip];
   if (!hostConf) return null;
   return new Promise(resolve => {
     const t = setTimeout(() => resolve(null), timeout);
+    const cmd = "free -m 2>/dev/null; echo '---CPUSTART---'; cat /proc/loadavg 2>/dev/null; nproc 2>/dev/null; echo '---DISKSTART---'; df -BG / 2>/dev/null | tail -1";
     const args = [
       '-i', BRUCE_SSH_KEY_PATH, '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=3',
-      `${hostConf.user}@${ip}`, 'free -m'
+      `${hostConf.user}@${ip}`, cmd
     ];
     execFile('ssh', args, { timeout }, (err, stdout) => {
       clearTimeout(t);
       if (err || !stdout) return resolve(null);
-      const lines = stdout.trim().split('\n');
-      const memLine = lines.find(l => l.startsWith('Mem:'));
-      if (!memLine) return resolve(null);
-      const parts = memLine.trim().split(/\s+/);
-      if (parts.length < 7) return resolve(null);
-      const total_mb = parseInt(parts[1]);
-      const used_mb = parseInt(parts[2]);
-      const available_mb = parseInt(parts[6]);
-      resolve({
-        total_gb: Math.round(total_mb / 1024 * 10) / 10,
-        used_gb: Math.round(used_mb / 1024 * 10) / 10,
-        available_gb: Math.round(available_mb / 1024 * 10) / 10,
-        used_pct: total_mb > 0 ? Math.round((total_mb - available_mb) / total_mb * 100) : 0,
-      });
+      const result = {};
+      // Parse RAM
+      const memLine = stdout.split('\n').find(l => l.startsWith('Mem:'));
+      if (memLine) {
+        const parts = memLine.trim().split(/\s+/);
+        if (parts.length >= 7) {
+          const total_mb = parseInt(parts[1]);
+          const used_mb = parseInt(parts[2]);
+          const available_mb = parseInt(parts[6]);
+          result.total_gb = Math.round(total_mb / 1024 * 10) / 10;
+          result.used_gb = Math.round(used_mb / 1024 * 10) / 10;
+          result.available_gb = Math.round(available_mb / 1024 * 10) / 10;
+          result.used_pct = total_mb > 0 ? Math.round((total_mb - available_mb) / total_mb * 100) : 0;
+        }
+      }
+      // Parse CPU (loadavg / nproc)
+      const cpuSection = stdout.split('---CPUSTART---')[1];
+      if (cpuSection) {
+        const cpuLines = cpuSection.split('---DISKSTART---')[0].trim().split('\n');
+        if (cpuLines.length >= 2) {
+          const load1 = parseFloat(cpuLines[0].split(' ')[0]);
+          const nproc = parseInt(cpuLines[1]);
+          if (!isNaN(load1) && nproc > 0) {
+            result.cpu_pct = Math.min(100, Math.round((load1 / nproc) * 100));
+            result.cpu_cores = nproc;
+          }
+        }
+      }
+      // Parse Disk (df root)
+      const diskSection = stdout.split('---DISKSTART---')[1];
+      if (diskSection) {
+        const diskLine = diskSection.trim().split('\n')[0];
+        if (diskLine) {
+          const dp = diskLine.trim().split(/\s+/);
+          if (dp.length >= 5) {
+            result.disk_total_gb = parseInt(dp[1]) || 0;
+            result.disk_used_gb = parseInt(dp[2]) || 0;
+            result.disk_pct = parseInt(dp[4]) || 0;
+          }
+        }
+      }
+      resolve(Object.keys(result).length > 0 ? result : null);
     });
   });
 }
@@ -260,6 +289,17 @@ function generateAlerts(physResults, vmResults, svcResults, pveBox1, pveBox2, re
       alerts.push({ level: pve.node.mem_pct >= 95 ? 'critical' : 'warning', msg: `${label} RAM: ${pve.node.mem_pct}% (${pve.node.mem_used_gb}/${pve.node.mem_total_gb} GB)` });
     }
   }
+  // [S1449] CPU alerts for VMs
+  for (const vm of vmResults) {
+    const cpu = (vm.real_mem && vm.real_mem.cpu_pct != null) ? vm.real_mem.cpu_pct : null;
+    if (cpu != null && cpu >= 80) {
+      alerts.push({ level: cpu >= 95 ? 'critical' : 'warning', msg: vm.name + ' CPU: ' + cpu + '%', cat: 'VM', source: 'ssh' });
+    }
+  }
+
+  // [S1449] TrueNAS RAM exception — only alert if available_gb < 0.5
+  // (ZFS ARC uses all RAM by design, so high % is normal)
+
   const pveVms = { ...(pveBox1 ? pveBox1.vms : {}), ...(pveBox2 ? pveBox2.vms : {}) };
   for (const vm of vmResults) {
     const realMem = realMemMap && realMemMap[vm.ip];
@@ -277,11 +317,71 @@ function generateAlerts(physResults, vmResults, svcResults, pveBox1, pveBox2, re
   return alerts;
 }
 
+
+// ============================================================
+// [1482] GPU Metrics from Prometheus — S1451
+// ============================================================
+const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://192.168.2.154:9090';
+const GPU_NAMES = {
+  'dfae4e42-5dbd-eb96-76a3-70b39e5180f3': 'RTX 3060',
+  'e1142975-928e-0368-507e-1ccc8695f0a9': 'Quadro M2000',
+};
+
+async function fetchGpuMetrics() {
+  try {
+    const queries = [
+      'nvidia_smi_utilization_gpu_ratio',
+      'nvidia_smi_memory_used_bytes',
+      'nvidia_smi_memory_total_bytes',
+      'nvidia_smi_temperature_gpu',
+      'nvidia_smi_power_draw_instant_watts',
+    ];
+    const results = await Promise.all(queries.map(async q => {
+      const r = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${q}`, { signal: AbortSignal.timeout(4000) });
+      if (!r.ok) return { metric: q, data: [] };
+      const j = await r.json();
+      return { metric: q, data: j.data && j.data.result ? j.data.result : [] };
+    }));
+
+    const gpuMap = {};
+    for (const r of results) {
+      for (const item of r.data) {
+        const uuid = item.metric && item.metric.uuid ? item.metric.uuid : 'unknown';
+        if (!gpuMap[uuid]) gpuMap[uuid] = { uuid, name: GPU_NAMES[uuid] || uuid };
+        const val = item.value && item.value[1] ? parseFloat(item.value[1]) : 0;
+        if (r.metric.includes('utilization_gpu')) gpuMap[uuid].utilization_pct = Math.round(val * 100);
+        else if (r.metric.includes('memory_used')) gpuMap[uuid].mem_used_mb = Math.round(val / 1048576);
+        else if (r.metric.includes('memory_total')) gpuMap[uuid].mem_total_mb = Math.round(val / 1048576);
+        else if (r.metric.includes('temperature')) gpuMap[uuid].temp_c = Math.round(val);
+        else if (r.metric.includes('power_draw_instant')) gpuMap[uuid].power_w = Math.round(val * 10) / 10;
+      }
+    }
+    // Compute VRAM percentage
+    for (const g of Object.values(gpuMap)) {
+      if (g.mem_total_mb > 0) g.mem_pct = Math.round((g.mem_used_mb / g.mem_total_mb) * 100);
+    }
+    return Object.values(gpuMap);
+  } catch (e) {
+    console.error('[health-all] GPU metrics error:', e.message);
+    return [];
+  }
+}
+
+
+// [1460] S1451 — Response cache 30s
+let _healthAllCache = { data: null, ts: 0 };
+const HEALTH_ALL_TTL = 30000;
+
 router.get('/bruce/health-all', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(401).json({ ok: false, error: 'Unauthorized' });
 
-  const [physResults, vmResults, svcResults, pveBox1, pveBox2, realMemMap] = await Promise.all([
+  // [1460] Cache — return cached if fresh
+  if (_healthAllCache.data && (Date.now() - _healthAllCache.ts) < HEALTH_ALL_TTL) {
+    return res.json({ ..._healthAllCache.data, cached: true });
+  }
+
+  const [physResults, vmResults, svcResults, pveBox1, pveBox2, realMemMap, physMemMap, gpuMetrics] = await Promise.all([
     Promise.all(PHYSICAL.map(async m => {
       const up = m.check === 'http' ? (await httpCheck(m.url)).ok : await pingCheck(m.ip);
       return { ...m, up, desc: DESC[m.name] || '' };
@@ -294,9 +394,11 @@ router.get('/bruce/health-all', async (req, res) => {
       const r = s.retry ? await httpCheckWithRetry(s.url, s.retry) : await httpCheck(s.url, s.timeout || 4000);
       return { ...s, up: r.ok, status: r.status, error: r.error, desc: DESC[s.name] || '' };
     })),
-    fetchProxmoxStats(PVE_BOX1, 'pve'),
+    fetchProxmoxStats(PVE_BOX1, 'Promox-Box'),
     fetchProxmoxStats(PVE_BOX2, 'pve'),
     fetchAllRealMemory(VMS),
+    fetchAllRealMemory(PHYSICAL),
+    fetchGpuMetrics(),
   ]);
 
   // [S1448] Proxmox fallback: if VM failed ping but Proxmox says running, mark as up
@@ -313,6 +415,11 @@ router.get('/bruce/health-all', async (req, res) => {
     if (realMemMap[vm.ip]) vm.real_mem = realMemMap[vm.ip];
   }
 
+  // [S1449] Assign real_mem to physical machines too
+  for (const phys of physResults) {
+    if (physMemMap && physMemMap[phys.ip]) phys.real_mem = physMemMap[phys.ip];
+  }
+
   const alerts = generateAlerts(physResults, vmResults, svcResults, pveBox1, pveBox2, realMemMap);
   const all = [...physResults, ...vmResults, ...svcResults];
   const up = all.filter(x => x.up).length;
@@ -325,17 +432,29 @@ router.get('/bruce/health-all', async (req, res) => {
     const directSvcs = svcResults.filter(s => s.host === p.ip);
     return { ...p, vms: childVms, services: directSvcs };
   });
+  // [S1449] Inject PVE hypervisor stats into physical machine tree entries
+  for (const p of tree) {
+    if (p.ip === '192.168.2.58' && pveBox1 && pveBox1.node) {
+      p.pve = pveBox1.node;
+    } else if (p.ip === '192.168.2.103' && pveBox2 && pveBox2.node) {
+      p.pve = pveBox2.node;
+    }
+  }
+
   const knownHosts = new Set([...physResults.map(p => p.ip), ...vmResults.map(v => v.ip)]);
   const orphanSvcs = svcResults.filter(s => !knownHosts.has(s.host));
 
-  res.json({
+  const _result = {
     ok: true, up, total: all.length,
     physical: physResults, vms: vmResults, services: svcResults,
     tree, orphan_services: orphanSvcs,
     pve_box1: pveBox1 ? pveBox1.node : null,
     pve_box2: pveBox2 ? pveBox2.node : null,
     alerts,
-  });
+    gpu: gpuMetrics || [],
+  };
+  _healthAllCache = { data: _result, ts: Date.now() };
+  res.json(_result);
 });
 
 // ============================================================
