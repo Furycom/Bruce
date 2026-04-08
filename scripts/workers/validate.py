@@ -47,7 +47,12 @@ KNOWN_COLUMNS = {
         "actor","session_id","intent","data_family","canonical_lock","authority_tier","protection_level","project_scope"},
     "knowledge_base": {"question","answer","category","subcategory","tags","author_system",
         "content_hash","validated","confidence_score","actor","session_id",
-        "intent","data_family","canonical_lock","authority_tier","protection_level","project_scope"},
+        "intent","data_family","canonical_lock","authority_tier","protection_level","project_scope",
+        # [S1460] colonnes manquantes — causaient POST canonical failed (HTTP 400 CHECK 23514)
+        "lifecycle_status","project_id","job_type","llm_model","script_version",
+        "bootstrap_critical","is_canon","canon_nominated","canon_nomination_source",
+        "canon_nomination_score","screensaver_reviewed_at","screensaver_jobs_completed",
+        "screensaver_keep_count","screensaver_cycle_count","tag_domain"},
     "current_state": {"key","value","updated_at","data_family","canonical_lock","authority_tier","protection_level"},
     "session_history": {"session_start","session_end","tasks_completed","notes",
         "author_system","content_hash","validated","data_family"},
@@ -82,6 +87,9 @@ LESSON_TYPES_FORBIDDEN = {
 
 # [602] Scopes de projet valides (registre project_keywords_registry)
 VALID_PROJECT_SCOPES = {"homelab", "musique", "domotique", "general"}
+
+# [S1460] Catégories valides pour knowledge_base (contrainte chk_kb_category Supabase)
+VALID_KB_CATEGORIES = {"architecture","governance","infrastructure","operational","personal","workflow"}
 
 # Longueurs minimales par table (sans dépendance à quality_gates.py)
 MIN_LENGTHS = {
@@ -190,6 +198,12 @@ def gate1_structural_check(table: str, contenu: dict, item_id: int) -> tuple[boo
                 break
         if len(text.strip()) < min_len:
             return False, f"Texte trop court ({len(text.strip())} chars < {min_len} minimum)"
+
+    # --- 1d. [S1460] Category valide pour knowledge_base (contrainte chk_kb_category) ---
+    if table == "knowledge_base":
+        kb_cat = (contenu.get("category") or "").strip().lower()
+        if kb_cat and kb_cat not in VALID_KB_CATEGORIES:
+            return False, f"knowledge_base: category '{kb_cat}' invalide — valeurs acceptées: {sorted(VALID_KB_CATEGORIES)}"
 
     # --- 1e. Vérification champs obligatoires knowledge_base ---
     if table == "knowledge_base":
@@ -351,6 +365,9 @@ def promote_to_canonical(staging_item):
         if table == "lessons_learned" and "date_learned" not in contenu:
             from datetime import timezone
             contenu["date_learned"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # [S1460] lifecycle_status obligatoire pour knowledge_base (CHECK constraint)
+        if table == "knowledge_base" and "lifecycle_status" not in contenu:
+            contenu["lifecycle_status"] = "active"
         contenu = filter_columns(table, contenu)
         ok = post(table, contenu)
 

@@ -449,7 +449,7 @@ router.post('/bruce/bootstrap', async (req, res) => {
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
 
   const topic = (req.body && req.body.topic) ? String(req.body.topic).slice(0, 200) : '';
-  const model = (req.body && req.body.model) ? String(req.body.model).slice(0, 20) : '';
+  const model = (req.body && req.body.model) ? String(req.body.model).slice(0, 10) : '';
   const profile = (req.body && req.body.profile) ? String(req.body.profile).slice(0, 10) : 'standard'; // [772] C6
   // [917] Pass-through output filtering flags to session/init
   const includeTasks = req.body && req.body.include_tasks === false ? false : true;
@@ -514,7 +514,7 @@ router.post('/bruce/bootstrap', async (req, res) => {
       context_meta: sessionData.context_meta || null,
       dashboard: sessionData.dashboard || null,
       // [S1444] Filter tasks to P1-P2 max 20 — saves ~5000 tokens
-      next_tasks: (sessionData.next_tasks || []).filter(t => t.priority <= 2).slice(0, 20),
+      next_tasks: (sessionData.next_tasks || []).filter(t => t.priority <= 2).slice(0, 10),
       // [S1444] Services registry removed — available in dashboard http://192.168.2.12:8029
       // Use /bruce/health-all for live service status
     };
@@ -672,7 +672,7 @@ router.post('/bruce/context/fetch', async (req, res) => {
             const lessonLines = lessons.slice(0, 3).map(l =>
               '- [' + l.importance + '] ' + truncateToTokens((l.lesson_text || ''), 70)
             );
-            const lessonText = '**LEÇONS ("' + topic.slice(0, 20) + '"):**\n' + lessonLines.join('\n');
+            const lessonText = '**LEÇONS ("' + topic.slice(0, 10) + '"):**\n' + lessonLines.join('\n');
             const lessonTrunc = truncateToTokens(lessonText, lessonBudget);
             parts.push(lessonTrunc);
             usedTokens += estimateTokens(lessonTrunc);

@@ -59,6 +59,9 @@ const healthAllRoutes = require('./routes/health-all');
 const dashboardProjectsRoutes = require('./routes/dashboard-projects');
 const dashboardControlRoutes = require("./routes/dashboard-control");
 const screensaverStatusRoutes = require("./routes/screensaver-status");
+const truenasRoutes = require("./routes/truenas");
+const n8nStatusRoutes = require("./routes/n8n-status");
+const pretachesRoutes = require("./routes/pretaches");
 const { detectLLMIdentity, loadLLMProfile, buildContextForProfile, bruceClientIp, BRUCE_OPERATING_PRINCIPLES } = require('./shared/llm-profiles');
 
 const app = express();
@@ -163,6 +166,9 @@ app.use(healthAllRoutes);
 app.use(dashboardProjectsRoutes);
 app.use(dashboardControlRoutes);
 app.use(screensaverStatusRoutes);
+app.use(truenasRoutes);
+app.use(n8nStatusRoutes);
+app.use(pretachesRoutes);
 sessionRoutes.setSafePythonSpawn(safePythonSpawn);
 
 // ========== HEALTH ==========

@@ -159,7 +159,7 @@ async function loadTopicContext(topic, supabaseUrl, supabaseKey) {
       const catFilter = mapping.kb_cats.map((c) => `category.eq.${encodeURIComponent(c)}`).join(',');
       const existingIds = new Set([...result.rules, ...result.runbooks].map((r) => r.source));
       const runbookResp = await fetchWithTimeout(
-        `${base}/knowledge_base?or=(${catFilter})&select=id,question,answer,category,subcategory&order=id.desc&limit=8`,
+        `${base}/knowledge_base?or=(${catFilter})&select=id,question,answer,category,subcategory&order=id.desc&limit=4`,
         { headers },
         5000,
       );

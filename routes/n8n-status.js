@@ -1,4 +1,4 @@
-// routes/n8n-status.js — [1392] S1451 n8n workflows status for dashboard
+// routes/n8n-status.js — [1392] S1452 n8n workflows status enrichi (lastExec, errorDetail)
 'use strict';
 const { Router } = require('express');
 const { validateBruceAuth } = require('../shared/auth');
@@ -19,19 +19,49 @@ router.get('/bruce/n8n-status', async (req, res) => {
   }
 
   try {
-    const [wfRes, exRes] = await Promise.all([
+    const [wfRes, exRes, exSuccessRes] = await Promise.all([
       fetch(`${N8N_URL}/workflows?limit=50`, { headers: { 'X-N8N-API-KEY': N8N_KEY }, signal: AbortSignal.timeout(8000) }),
-      fetch(`${N8N_URL}/executions?limit=10&status=error`, { headers: { 'X-N8N-API-KEY': N8N_KEY }, signal: AbortSignal.timeout(8000) }),
+      fetch(`${N8N_URL}/executions?limit=20&status=error`, { headers: { 'X-N8N-API-KEY': N8N_KEY }, signal: AbortSignal.timeout(8000) }),
+      fetch(`${N8N_URL}/executions?limit=50&status=success`, { headers: { 'X-N8N-API-KEY': N8N_KEY }, signal: AbortSignal.timeout(8000) }),
     ]);
 
     const wfData = await wfRes.json();
     const exData = await exRes.json();
+    const exSuccessData = await exSuccessRes.json();
+
+    // Build map of latest execution per workflow (success or error)
+    const allExecs = [...(exData.data || []), ...(exSuccessData.data || [])];
+    const lastExecByWf = {};
+    for (const ex of allExecs) {
+      const wid = ex.workflowId;
+      if (!lastExecByWf[wid] || new Date(ex.startedAt) > new Date(lastExecByWf[wid].startedAt)) {
+        lastExecByWf[wid] = ex;
+      }
+    }
 
     const result = {
       ok: true,
       generated_at: new Date().toISOString(),
-      workflows: (wfData.data || []).map(w => ({ id: w.id, name: w.name, active: w.active })),
-      recentErrors: (exData.data || []).map(e => ({ id: e.id, workflowId: e.workflowId, status: e.status, startedAt: e.startedAt, stoppedAt: e.stoppedAt })),
+      workflows: (wfData.data || []).map(w => ({
+        id: w.id,
+        name: w.name,
+        active: w.active,
+        updatedAt: w.updatedAt || null,
+        lastExec: lastExecByWf[w.id] ? {
+          status: lastExecByWf[w.id].status,
+          startedAt: lastExecByWf[w.id].startedAt,
+          stoppedAt: lastExecByWf[w.id].stoppedAt,
+        } : null,
+      })),
+      recentErrors: (exData.data || []).map(e => ({
+        id: e.id,
+        workflowId: e.workflowId,
+        workflowName: (wfData.data || []).find(w => w.id === e.workflowId)?.name || `WF#${e.workflowId}`,
+        status: e.status,
+        startedAt: e.startedAt,
+        stoppedAt: e.stoppedAt,
+        errorMessage: e.data?.resultData?.error?.message || e.data?.resultData?.lastNodeExecuted || null,
+      })),
     };
 
     _cache = { data: result, ts: Date.now() };
