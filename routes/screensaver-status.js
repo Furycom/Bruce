@@ -1,4 +1,4 @@
-// routes/screensaver-status.js — [1480] S1450 Screensaver real-time status
+// routes/screensaver-status.js — [1480] S1464 FIXED job order alignment with Python
 'use strict';
 const { Router } = require('express');
 const { validateBruceAuth } = require('../shared/auth');
@@ -9,27 +9,31 @@ const router = Router();
 const SCREENSAVER_HOST = '192.168.2.230';
 const STATE_FILE = '/home/furycom/logs/screensaver_state.json';
 
+// MUST match bruce_screensaver.py exactly:
+// Phase 0 (housekeeping): staging_purge, audit_log_rotation  (run before pipeline_stage_index=0)
+// Phase 1 (PIPELINE_STAGES index 0-5): dedup, cross_table_coherence, lesson_review, kb_audit, canon_nomination, vrc_pipeline
+// Phase 2 (AUXILIARY_JOBS index 6-8): ingestion, session_summary, lightrag
+const HOUSEKEEPING = ['staging_purge', 'audit_log_rotation'];
+const PIPELINE = ['dedup', 'cross_table_coherence', 'lesson_review', 'kb_audit', 'canon_nomination', 'vrc_pipeline'];
+const AUXILIARY = ['ingestion', 'session_summary', 'lightrag'];
+const ALL_STAGES = [...PIPELINE, ...AUXILIARY]; // index 0-8 = pipeline_stage_index
+const ALL_JOBS = [...HOUSEKEEPING, ...PIPELINE, ...AUXILIARY]; // for display
+
 const JOB_NAMES = {
   staging_purge: 'Nettoyage staging',
-  audit_log_rotation: 'Rotation des logs',
-  ingestion: 'Ingestion de fichiers',
+  audit_log_rotation: 'Rotation logs',
   dedup: 'Dédoublonnage',
-  lesson_review: 'Revue des lessons',
-  kb_audit: 'Audit des KB',
-  session_summary: 'Résumé de sessions',
-  lightrag: 'Indexation LightRAG',
-  canon_nomination: 'Nomination canon',
   cross_table_coherence: 'Cohérence inter-tables',
-  canon_vrc: 'Vérification VRC',
-  vrc_pipeline: 'Pipeline VRC',
+  lesson_review: 'Revue lessons',
+  kb_audit: 'Audit KB',
+  canon_nomination: 'Nomination canon',
+  vrc_pipeline: 'Vérification VRC',
+  ingestion: 'Ingestion fichiers',
+  session_summary: 'Résumé sessions',
+  lightrag: 'Indexation RAG',
+  canon_vrc: 'Vérification VRC (ancien)',
   coherence: 'Cohérence données',
 };
-
-const JOB_ORDER = [
-  'staging_purge', 'audit_log_rotation', 'ingestion', 'dedup',
-  'lesson_review', 'kb_audit', 'session_summary', 'lightrag',
-  'canon_nomination', 'cross_table_coherence', 'canon_vrc', 'vrc_pipeline', 'coherence'
-];
 
 function sshExec(command, timeout) {
   timeout = timeout || 8000;
@@ -50,76 +54,79 @@ function sshExec(command, timeout) {
   });
 }
 
+function computeTimingSummary(jobTimings, currentStageStartedAt, cycleStartedAt, lastCycleDuration) {
+  const now = Date.now() / 1000;
+  const summary = {};
+  let totalAvg = 0;
+  let jobsWithData = 0;
+  for (const [jobKey, entries] of Object.entries(jobTimings || {})) {
+    if (!Array.isArray(entries) || entries.length === 0) continue;
+    const durations = entries.map(e => e.duration_s).filter(d => typeof d === 'number');
+    if (durations.length === 0) continue;
+    const avg = durations.reduce((a, b) => a + b, 0) / durations.length;
+    const last = entries[entries.length - 1];
+    summary[jobKey] = { avg_s: Math.round(avg * 10) / 10, last_s: last.duration_s, last_result: last.result, last_ts: last.ts, samples: durations.length };
+    totalAvg += avg;
+    jobsWithData++;
+  }
+  let currentStageElapsed = null;
+  if (currentStageStartedAt && typeof currentStageStartedAt === 'number') currentStageElapsed = Math.round(now - currentStageStartedAt);
+  let cycleElapsed = null;
+  if (cycleStartedAt && typeof cycleStartedAt === 'number') cycleElapsed = Math.round(now - cycleStartedAt);
+  return { byJob: summary, currentStageElapsed_s: currentStageElapsed, cycleElapsed_s: cycleElapsed, lastCycleDuration_s: lastCycleDuration || null, estimatedCycleDuration_s: jobsWithData > 0 ? Math.round(totalAvg) : null };
+}
 
-// [1460] S1451 — Response cache 30s
 let _ssCache = { data: null, ts: 0 };
 const SS_TTL = 30000;
 
 router.get('/bruce/screensaver-status', async (req, res) => {
   const auth = validateBruceAuth(req);
   if (!auth.ok) return res.status(auth.status || 401).json({ ok: false, error: auth.error });
-
-  // [1460] Cache — return cached if fresh
-  if (_ssCache.data && (Date.now() - _ssCache.ts) < SS_TTL) {
-    return res.json({ ..._ssCache.data, cached: true });
-  }
+  if (_ssCache.data && (Date.now() - _ssCache.ts) < SS_TTL) return res.json({ ..._ssCache.data, cached: true });
 
   try {
-    // 1. Check process
-    let processAlive = false;
-    let processPid = null;
-    let processUptime = null;
+    let processAlive = false, processPid = null, processUptime = null;
     try {
       const psOut = await sshExec("ps aux | grep 'bruce_screensaver.py --loop' | grep -v grep | head -1");
-      if (psOut) {
-        processAlive = true;
-        const parts = psOut.split(/\s+/);
-        processPid = parts[1] || null;
-        // Parse CPU time from ps aux (column 9 = START or TIME)
-        processUptime = parts[9] || null;
-      }
-    } catch (e) { /* process not found */ }
+      if (psOut) { processAlive = true; const parts = psOut.split(/\s+/); processPid = parts[1] || null; processUptime = parts[9] || null; }
+    } catch (e) {}
 
-    // 2. Read state file
     let state = null;
-    try {
-      const stateRaw = await sshExec('cat ' + STATE_FILE);
-      state = JSON.parse(stateRaw);
-    } catch (e) { /* state file not accessible */ }
+    try { const stateRaw = await sshExec('cat ' + STATE_FILE); state = JSON.parse(stateRaw); } catch (e) {}
 
-    // 3. Build response
-    const currentJobIndex = state ? state.current_job_index : null;
-    const currentJobKey = currentJobIndex != null ? JOB_ORDER[currentJobIndex] || `job_${currentJobIndex}` : null;
-    const currentJobName = currentJobKey ? (JOB_NAMES[currentJobKey] || currentJobKey) : null;
+    // pipeline_stage_index: -1 = housekeeping, 0-5 = PIPELINE, 6-8 = AUXILIARY
+    const psi = state ? state.pipeline_stage_index : null;
+    let currentStageKey = null, currentStageName = null, currentDisplayIndex = null;
+    if (psi != null && psi >= 0 && psi < ALL_STAGES.length) {
+      currentStageKey = ALL_STAGES[psi];
+      currentStageName = JOB_NAMES[currentStageKey] || currentStageKey;
+      currentDisplayIndex = psi + 2; // +2 because housekeeping is 0,1
+    } else if (psi === -1) {
+      currentStageKey = 'housekeeping';
+      currentStageName = 'Nettoyage (staging + logs)';
+      currentDisplayIndex = 0;
+    }
 
-    // Job health summary
+    // Job health
     const jobs = [];
     if (state && state.jobs) {
-      JOB_ORDER.forEach((key, idx) => {
+      ALL_JOBS.forEach((key, idx) => {
         const j = state.jobs[key] || {};
         const disabledUntil = j.disabled_until || 0;
         const now = Math.floor(Date.now() / 1000);
         const isDisabled = disabledUntil > now;
-        const isCurrent = idx === currentJobIndex;
-        jobs.push({
-          key,
-          name: JOB_NAMES[key] || key,
-          failures: j.failures || 0,
-          lastError: j.last_error || null,
-          disabled: isDisabled,
-          disabledFor: isDisabled ? Math.round((disabledUntil - now) / 60) + ' min' : null,
-          current: isCurrent,
-        });
+        const isCurrent = (psi === -1 && idx < 2) ? false : (psi >= 0 && key === ALL_STAGES[psi]);
+        jobs.push({ key, name: JOB_NAMES[key] || key, failures: j.failures || 0, lastError: j.last_error || null, disabled: isDisabled, disabledFor: isDisabled ? Math.round((disabledUntil - now) / 60) + ' min' : null, current: isCurrent });
       });
     }
 
-    // Metrics
     const metrics = state ? state.metrics || {} : {};
+    const timings = state ? computeTimingSummary(state.job_timings, state.current_stage_started_at, state.cycle_started_at, state.last_cycle_duration_s) : null;
 
     const _ssResult = {
       ok: true,
       process: { alive: processAlive, pid: processPid, uptime: processUptime },
-      currentJob: { index: currentJobIndex, key: currentJobKey, name: currentJobName },
+      currentJob: { index: currentDisplayIndex, key: currentStageKey, name: currentStageName, pipelineStageIndex: psi },
       totalCycles: metrics.cycles || 0,
       totalBatches: metrics.batches || 0,
       itemsUpdated: metrics.items_updated || 0,
@@ -128,6 +135,7 @@ router.get('/bruce/screensaver-status', async (req, res) => {
       canonNominations: metrics.canon_nominations || 0,
       vrcEvaluations: metrics.vrc_evaluations || 0,
       lightragInserts: metrics.lightrag_inserts || 0,
+      timings,
       jobs,
       generated_at: new Date().toISOString(),
     };

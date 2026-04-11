@@ -15,7 +15,7 @@ const TOKEN_BUDGET = {
 
 // [CE-0b] Cache user_profile — TTL 5 minutes (memes donnees changent rarement)
 let _userProfileCache = { data: null, ts: 0 };
-const USER_PROFILE_CACHE_TTL = 5 * 60 * 1000;
+const USER_PROFILE_CACHE_TTL = 30 * 60 * 1000;
 
 // [1192] Cache LightRAG JWT token — TTL 23 hours (token expires in 24h)
 let _lightragTokenCache = { token: null, ts: 0 };
@@ -119,7 +119,8 @@ async function fetchLightRAGContext(query, maxTokens) {
 // Sources: user_profile (exigences, profile, wishes), handoff_vivant
 // ============================================================
 
-async function buildAnchorLayer(currentState, dashboard) {
+async function buildAnchorLayer(currentState, dashboard, options) {
+  const skipProfile = (options && options.skipProfile) || false;
   const parts = [];
   let usedTokens = 0;
 
@@ -162,7 +163,7 @@ async function buildAnchorLayer(currentState, dashboard) {
       if (byCategory['exigence']) {
         const exLines = byCategory['exigence']
           .filter(e => e.priority === 'critical')
-          .map(e => '- ' + truncateToTokens(e.text, 50));
+          .map(e => '- ' + truncateToTokens(e.text, 30));
         if (exLines.length > 0) {
           const exText = '**EXIGENCES YANN:**\n' + exLines.join('\n');
           parts.push(exText);
@@ -170,12 +171,13 @@ async function buildAnchorLayer(currentState, dashboard) {
         }
       }
 
-      // 1b-ii. PROFILE condensed — key behavioral patterns
+      // 1b-ii. PROFILE condensed (skipped for Claude — already in userMemories)
+      if (!skipProfile) {
       const profileCats = ['ce_qui_l_irrite', 'ce_qu_il_valorise', 'comment_il_travaille', 'ses_buts', 'qui_il_est'];
       const profileLines = [];
       for (const cat of profileCats) {
         if (byCategory[cat]) {
-          const obs = byCategory[cat].slice(0, 1).map(o => truncateToTokens(o.text, 75)).join('');
+          const obs = byCategory[cat].slice(0, 1).map(o => truncateToTokens(o.text, 50)).join('');
           profileLines.push(cat.replace(/_/g, ' ') + ': ' + obs);
         }
       }
@@ -188,12 +190,14 @@ async function buildAnchorLayer(currentState, dashboard) {
         }
       }
 
+      } // end skipProfile
+
       // 1b-iii. ACTIVE WISHES — what Yann wants (high priority only)
       if (byCategory['user_wish']) {
         const wishes = byCategory['user_wish']
           .filter(w => w.priority === 'high' || w.priority === 'critical')
           .slice(0, 3)
-          .map(w => '- ' + (w.sub || '') + ': ' + truncateToTokens(w.text, 40));
+          .map(w => '- ' + (w.sub || '') + ': ' + truncateToTokens(w.text, 25));
         if (wishes.length > 0) {
           const remaining = TOKEN_BUDGET.anchor - usedTokens - 20;
           if (remaining > 50) {
@@ -291,7 +295,7 @@ function buildSessionLayer(tasks, lessons, ragResults, topic, lightragContext) {
 async function buildContextForClaude({ dashboard, tasks, lessons, ragResults, currentState, topic }) {
   // [1192] Fetch LightRAG context in parallel with anchor layer (non-blocking)
   const [anchor, lightragCtx] = await Promise.all([
-    buildAnchorLayer(currentState, dashboard),
+    buildAnchorLayer(currentState, dashboard, { skipProfile: true }),
     fetchLightRAGContext(topic || 'homelab BRUCE architecture', 250).catch(() => null)
   ]);
   const session = buildSessionLayer(tasks, lessons, ragResults, topic, lightragCtx);

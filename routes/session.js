@@ -440,13 +440,13 @@ Sois direct, precis, actionnable.`;
       llm_ok: llmOk,
       dashboard,
       // [829] Compact next_tasks: strip descriptions to save ~4000 tokens
-      next_tasks: includeTasks ? roadmap.filter(t => t.priority !== "P5").slice(0, 100).map(t => ({ id: t.id, status: t.status, priority: t.priority, step_name: t.step_name, model_hint: t.model_hint })) : [],
-      critical_lessons: includeLessons ? effectiveLessons.map(l => ({...l, lesson_text: l.lesson_text ? l.lesson_text.slice(0, 250) : ''})) : [],
-      last_session: lastSession,
-      rag_context: ragResults,
+      next_tasks: includeTasks ? roadmap.filter(t => t.priority <= 3).filter(t => { const m = (req.body && req.body.model) || ''; return (m === 'haiku' || m === 'sonnet') ? (t.model_hint === m || !t.model_hint) : true; }).slice(0, 10).map(t => ({ id: t.id, status: t.status, priority: t.priority, step_name: t.step_name, model_hint: t.model_hint })) : [],
+      critical_lessons: includeLessons ? effectiveLessons.slice(0, 3).map(l => ({ id: l.id, lesson_text: l.lesson_text ? l.lesson_text.slice(0, 150) : '', importance: l.importance, lesson_type: l.lesson_type })) : [],
+      last_session: lastSession ? { id: lastSession.id, notes: (lastSession.notes || '').slice(0, 200), tasks_completed: lastSession.tasks_completed } : null,
+      // [S1467] rag_context removed — already in context_prompt
       current_state: includeState ? currentState : [],
       // [828] homelab_services removed — see claude.md + SERVICES_CONFIG
-      clarifications_pending: clarificationsPending,
+      clarifications_pending_count: clarificationsPending.length,
       // [779] Rappel obligatoire pour sessions Code
       code_checklist: (req.body && req.body.model === 'code') ? {
         warning: '[779] SESSION CODE: checklist obligatoire',

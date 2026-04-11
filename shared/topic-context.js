@@ -98,20 +98,28 @@ async function loadTopicContext(topic, supabaseUrl, supabaseKey) {
     // ── 0. Always load bootstrap_critical KB (guaranteed context, bypass RAG score) ──
     // [1201] Ces KB sont toujours incluses dans le bootstrap, indépendamment du topic
     const bcResp = await fetchWithTimeout(
-      `${base}/knowledge_base?bootstrap_critical=eq.true&archived=eq.false&select=id,question,answer,category,subcategory&order=id.asc`,
+      `${base}/knowledge_base?bootstrap_critical=eq.true&archived=eq.false&select=id,question,answer,category,subcategory,tags&order=id.asc`,
       { headers },
       5000,
     );
     if (bcResp.ok) {
       const bcEntries = await bcResp.json();
+      // [S1467] Filter bootstrap_critical by topic relevance via tags
+      const topicTags = (mapping && mapping.kb_tags) ? mapping.kb_tags : [];
       for (const e of bcEntries) {
+        const eTags = Array.isArray(e.tags) ? e.tags : (typeof e.tags === 'string' ? (() => { try { return JSON.parse(e.tags); } catch(_) { return []; } })() : []);
+        const isUniversal = eTags.length === 0 || e.subcategory === 'directive' || e.subcategory === 'user-profile';
+        if (!isUniversal && topicTags.length > 0) {
+          const hasMatch = eTags.some(t => topicTags.includes(t) || t === topicKey);
+          if (!hasMatch) continue;
+        }
         const isRule = e.subcategory === 'anti-patterns' || e.category === 'governance';
         const target = isRule ? result.rules : result.runbooks;
         target.push({
           source: `KB#${e.id}`,
           category: e.category,
           subcategory: e.subcategory,
-          text: (e.answer || '').substring(0, 500),
+          text: (e.answer || '').substring(0, 200),
           bootstrap_critical: true,
         });
       }
@@ -135,7 +143,7 @@ async function loadTopicContext(topic, supabaseUrl, supabaseKey) {
     if (mapping && mapping.kb_tags && mapping.kb_tags.length > 0) {
       const tagFilter = mapping.kb_tags.map((t) => encodeURIComponent(t)).join(',');
       const kbResp = await fetchWithTimeout(
-        `${base}/knowledge_base?tags=ov.{${tagFilter}}&select=id,question,answer,category,subcategory&limit=10`,
+        `${base}/knowledge_base?tags=ov.{${tagFilter}}&select=id,question,answer,category,subcategory&limit=0`,
         { headers },
         5000,
       );
@@ -148,7 +156,7 @@ async function loadTopicContext(topic, supabaseUrl, supabaseKey) {
             source: `KB#${e.id}`,
             category: e.category,
             subcategory: e.subcategory,
-            text: (e.answer || '').substring(0, 500),
+            text: (e.answer || '').substring(0, 200),
           });
         }
       }
@@ -159,7 +167,7 @@ async function loadTopicContext(topic, supabaseUrl, supabaseKey) {
       const catFilter = mapping.kb_cats.map((c) => `category.eq.${encodeURIComponent(c)}`).join(',');
       const existingIds = new Set([...result.rules, ...result.runbooks].map((r) => r.source));
       const runbookResp = await fetchWithTimeout(
-        `${base}/knowledge_base?or=(${catFilter})&select=id,question,answer,category,subcategory&order=id.desc&limit=4`,
+        `${base}/knowledge_base?or=(${catFilter})&select=id,question,answer,category,subcategory&order=id.desc&limit=2`,
         { headers },
         5000,
       );
@@ -175,7 +183,7 @@ async function loadTopicContext(topic, supabaseUrl, supabaseKey) {
             source: src,
             category: e.category,
             subcategory: e.subcategory,
-            text: (e.answer || '').substring(0, 500),
+            text: (e.answer || '').substring(0, 200),
           });
         }
       }
@@ -184,7 +192,7 @@ async function loadTopicContext(topic, supabaseUrl, supabaseKey) {
     // ── 4. Always load top 5 governance anti-patterns (deduplicated) ──
     const existingIds = new Set([...result.rules, ...result.runbooks].map((r) => r.source));
     const govResp = await fetchWithTimeout(
-      `${base}/knowledge_base?category=eq.governance&subcategory=eq.anti-patterns&select=id,question,answer&order=id.asc&limit=5`,
+      `${base}/knowledge_base?category=eq.governance&subcategory=eq.anti-patterns&select=id,question,answer&order=id.asc&limit=0`,
       { headers },
       5000,
     );
@@ -198,7 +206,7 @@ async function loadTopicContext(topic, supabaseUrl, supabaseKey) {
             source: src,
             category: 'governance',
             subcategory: 'anti-patterns',
-            text: (e.answer || '').substring(0, 500),
+            text: (e.answer || '').substring(0, 200),
           });
         }
       }
