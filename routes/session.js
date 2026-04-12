@@ -58,7 +58,7 @@ router.post('/bruce/session/init', async (req, res) => {
     const rpcProfile = (req.body && req.body.profile && ['standard','light','minimal'].includes(req.body.profile)) ? req.body.profile : 'standard'; // [772] C6 profil adaptatif
     const hSupaJson = { ...hSupa, 'Content-Type': 'application/json' };
 
-    const [rpcRes, bruceToolsRes, clarifRes] = await Promise.all([
+    const [rpcRes, bruceToolsRes, clarifRes, pretachesRes] = await Promise.all([
       // [820] 1 RPC remplace 5 fetch (current_state, lessons, roadmap, dashboard, last_session)
       fetchWithTimeout(base + '/rpc/bootstrap_payload', {
         method: 'POST',
@@ -69,11 +69,14 @@ router.post('/bruce/session/init', async (req, res) => {
       fetchWithTimeout(base + '/bruce_tools?status=in.(active,available)&order=subcategory.asc,name.asc&select=id,name,description,subcategory,status,underutilized,trigger_text', { headers: hSupa }, 8000),
       // Kept: clarifications_pending (not in RPC)
       fetchWithTimeout(base + '/clarifications_pending?status=eq.pending&order=id.asc&select=id,question_text,created_at', { headers: hSupa }, 5000),
+      // Kept: pretaches pending (not in RPC)
+      fetchWithTimeout(base + '/pretaches?status=eq.new&select=id', { headers: hSupa }, 5000),
     ]);
 
     const rpcPayload = await rpcRes.json();
     const bruceToolsArr = await bruceToolsRes.json();
     const clarifArr = await clarifRes.json().catch((error) => (console.error(`[session.js] operation failed:`, error.message), []));
+    const pretachesArr = await pretachesRes.json().catch((error) => (console.error(`[session.js] operation failed:`, error.message), []));
 
     // [820] Extract from RPC result
     const currentState = rpcPayload.current_state || [];
@@ -84,6 +87,7 @@ router.post('/bruce/session/init', async (req, res) => {
     // [828] homelab_services removed — already in claude.md + SERVICES_CONFIG
     const bruceTools = Array.isArray(bruceToolsArr) ? bruceToolsArr : [];
     const clarificationsPending = Array.isArray(clarifArr) ? clarifArr : [];
+    const pretachesPending = Array.isArray(pretachesArr) ? pretachesArr : [];
 
     // [816] Create new session in session_history and capture session_id
     let newSessionId = null;
@@ -447,6 +451,7 @@ Sois direct, precis, actionnable.`;
       current_state: includeState ? currentState : [],
       // [828] homelab_services removed — see claude.md + SERVICES_CONFIG
       clarifications_pending_count: clarificationsPending.length,
+      pretaches_pending_count: pretachesPending.length,
       // [779] Rappel obligatoire pour sessions Code
       code_checklist: (req.body && req.body.model === 'code') ? {
         warning: '[779] SESSION CODE: checklist obligatoire',

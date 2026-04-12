@@ -10,7 +10,7 @@ LLM_API_KEY = "token-abc123"
 MODEL_NAME = os.environ.get("DSPY_MODEL_NAME", "openai/local")
 TIMEOUT_SEC = 180
 MAX_TOKENS = 800
-RESULTS_DIR = os.environ.get("DSPY_RESULTS_DIR", "/workspace/dspy-results")
+RESULTS_DIR = os.environ.get("DSPY_RESULTS_DIR", "/tmp/dspy_results")
 GOLD_FILE = os.environ.get("DSPY_GOLD_FILE", "")
 TASK = os.environ.get("DSPY_TASK", "dedup")
 os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -44,11 +44,9 @@ class DedupSignature(dspy.Signature):
     """Compare deux lessons BRUCE, determine si doublons semantiques. JSON: {is_duplicate, keep_id, archive_id, reason, confidence}."""
     input_pair: str = dspy.InputField(desc="JSON: {id_a, text_a, id_b, text_b}")
     expected_verdict: str = dspy.OutputField(desc="JSON verdict")
-
 class DedupModule(dspy.Module):
     def __init__(self): super().__init__(); self.predict = dspy.Predict(DedupSignature)
     def forward(self, input_pair): return self.predict(input_pair=input_pair)
-
 def dedup_metric(example, prediction, trace=None):
     try:
         def pv(t):
@@ -72,11 +70,9 @@ class SummarySignature(dspy.Signature):
     """Resume concis session BRUCE depuis lessons. JSON: {summary: "texte"}. 1-3 phrases factuelles."""
     input_lessons: str = dspy.InputField(desc="JSON array [{id, lesson_text, importance}]")
     expected_summary: str = dspy.OutputField(desc='JSON: {summary: "..."}')
-
 class SummaryModule(dspy.Module):
     def __init__(self): super().__init__(); self.predict = dspy.Predict(SummarySignature)
     def forward(self, input_lessons): return self.predict(input_lessons=input_lessons)
-
 def summary_metric(example, prediction, trace=None):
     try:
         e,p = safe_parse_json(example.expected_summary), safe_parse_json(prediction.expected_summary)
@@ -94,17 +90,32 @@ def summary_metric(example, prediction, trace=None):
 
 # ===== KB AUDIT =====
 class KbAuditSignature(dspy.Signature):
-    """Audite des entrees KB BRUCE. Pour chaque entree: keep (correct), archive (obsolete), update (ameliorer).
-    Contexte: Supabase .146, Gateway .230, Qwen3-32B .32, n8n .174, embedder .85. vLLM et .206 sont OBSOLETES.
+    """Auditeur EXIGEANT de la base de connaissances BRUCE (homelab AI).
+    Garantir que chaque fiche est UTILE, PRECISE et NON REDONDANTE.
+    TECHNOLOGIES OBSOLETES (archiver si presentees comme actuelles):
+    - vLLM -> REMPLACE PAR llama.cpp server-cuda
+    - Qwen 7B / Qwen2.5-7B / Qwen 2.5 8B -> REMPLACE PAR Qwen3-32B Q4_K_M
+    - Ollama sur .32 -> REMPLACE PAR llama.cpp
+    - 192.168.2.206 (ancien Supabase) -> REMPLACE PAR 192.168.2.146. .206 est MORT
+    - Gate-2 validation vLLM -> REMPLACE PAR Gate-1 schema + triggers PG
+    - CURRENT_STATE table / handoff via current_state JSON -> REMPLACE PAR Memory MCP 5-tier (BRUCE_STATE + PIEGES_ACTIFS)
+    - vllm service name -> REMPLACE PAR llama-server
+    - llm_swapper.py -> OBSOLETE, ne plus utiliser
+    ARCHITECTURE ACTUELLE: Supabase .146, Gateway .230:4000, LLM Qwen3-32B .32:8000, n8n .174, embedder BGE-M3 .85:8081.
+    CRITERES:
+    - ARCHIVE si: mentionne une techno/IP obsolete ci-dessus, incorrecte, trop vague, ou couverte par une autre fiche.
+    - UPDATE si: correct mais incomplet, IP/version a corriger, ou texte trop court. improved_text OBLIGATOIRE.
+    - KEEP si: correct, specifique, actionable, coherent avec architecture actuelle.
+    IMPORTANT: Proposer ARCHIVE ou UPDATE pour au moins 30% des fiches. Ne pas tamponner KEEP.
     JSON: {reviews: [{id, verdict: keep|archive|update, reason, improved_text}]}."""
     input_kb: str = dspy.InputField(desc="JSON array [{id, question, answer}]")
-    expected_review: str = dspy.OutputField(desc="JSON: {reviews: [...]}")
-
+    expected_review: str = dspy.OutputField(desc="JSON: {reviews: [{id, verdict: keep|archive|update, reason, improved_text or null}]}")
 class KbAuditModule(dspy.Module):
     def __init__(self): super().__init__(); self.predict = dspy.Predict(KbAuditSignature)
     def forward(self, input_kb): return self.predict(input_kb=input_kb)
 
 def kb_audit_metric(example, prediction, trace=None):
+    """Score kb_audit: verdict match (60%) + improved_text quality for updates (40%)."""
     try:
         def parse_reviews(text):
             raw = safe_parse_json(text)
@@ -165,8 +176,15 @@ if __name__ == "__main__":
     log.info("=" * 60)
     cache_dir = os.path.expanduser("~/.dspy_cache")
     if os.path.exists(cache_dir): shutil.rmtree(cache_dir)
+    # [S1483] Disable DSPy global disk cache (FanoutCache/SQLite) — root cause of BFSRS crash
+    # cache=False in dspy.LM() only prevents LM from using cache, but the global
+    # dspy.cache object still creates a FanoutCache with SQLite that crashes under
+    # concurrent writes from BFSRS parallelizer
+    dspy.cache.enable_disk_cache = False
+    dspy.cache.disk_cache = {}
+    log.info("DSPy global disk cache DISABLED (FanoutCache SQLite fix)")
     lm = dspy.LM(model=MODEL_NAME, api_base=LLM_BASE_URL, api_key=LLM_API_KEY,
-                  max_tokens=MAX_TOKENS, timeout=TIMEOUT_SEC)
+                  max_tokens=MAX_TOKENS, timeout=TIMEOUT_SEC, cache=False)  # [S1482] cache=False prevents SQLite crash in BFSRS
     dspy.configure(lm=lm)
     with open(GOLD_FILE) as f: raw_gold = json.load(f)
 
@@ -200,7 +218,7 @@ if __name__ == "__main__":
     log.info("\n--- LabeledFewShot ---")
     t0=time.time()
     try:
-        opt_labeled = dspy.LabeledFewShot(k=min(4,len(TRAIN))).compile(ModuleClass(), trainset=TRAIN)
+        opt_labeled = dspy.LabeledFewShot(k=min(8,len(TRAIN))).compile(ModuleClass(), trainset=TRAIN)
         log.info(f"LabeledFewShot done in {round(time.time()-t0,1)}s")
     except Exception as e: log.error(f"LFS FAILED: {e}"); opt_labeled=baseline
     ts_l,_ = evaluate(opt_labeled, DEV, "LABELED-DEV", TASK)
@@ -220,7 +238,7 @@ if __name__ == "__main__":
     if os.path.exists(cache_dir): shutil.rmtree(cache_dir)
     t0=time.time()
     try:
-        opt_bfsrs = dspy.BootstrapFewShotWithRandomSearch(metric=metric_fn, max_bootstrapped_demos=4, max_labeled_demos=4, num_candidate_programs=6).compile(ModuleClass(), trainset=TRAIN, valset=DEV)
+        opt_bfsrs = dspy.BootstrapFewShotWithRandomSearch(metric=metric_fn, max_bootstrapped_demos=4, max_labeled_demos=4, num_candidate_programs=6, num_threads=1).compile(ModuleClass(), trainset=TRAIN, valset=DEV)
         log.info(f"BFSRS done in {round(time.time()-t0,1)}s")
     except Exception as e: log.error(f"BFSRS FAILED: {e}"); opt_bfsrs=baseline
     ts_bfsrs,_ = evaluate(opt_bfsrs, DEV, "BFSRS-DEV", TASK)
